@@ -6,7 +6,7 @@ Personal idea-hub web app. Each user has one private canvas-style whiteboard whe
 
 ## Stack
 
-- **Backend:** Go + [Drift](../../../DRIFT.md) (no external router/middleware deps), Postgres via `database/sql` + `lib/pq`.
+- **Backend:** Go + [Drift](../../../DRIFT.md) (no external router/middleware deps), Postgres via `database/sql` + `lib/pq`, logging via [nikologs-go](../../../NIKOLOGS-GO.md).
 - **Frontend:** Angular 21 standalone + [@m1z23r/ngx-ui](../../../NGX-UI.md), signal-based, OnPush.
 - **Database:** Postgres (local install, no docker).
 - **Deployment:** systemd unit on a VPS; nginx reverse-proxies `/api/v1` → Go binary and serves SPA from `/var/www/nikohub/`.
@@ -219,6 +219,24 @@ Override in `styles.css`:
 }
 ```
 
+## Logging
+
+Backend uses [`github.com/M1z23r/nikologs-go`](../../../NIKOLOGS-GO.md). Construct a single `*nikologs.Client` as `nlog` in `main` and inject it into handlers/services as a dependency.
+
+```go
+nlog := nikologs.New(cfg.NikologsAPIKey,
+    nikologs.WithSource("nikohub"),
+    nikologs.WithFlushInterval(3*time.Second),
+    nikologs.WithBatchSize(200),
+    nikologs.WithOnError(func(err error) { log.Printf("nlog: %v", err) }),
+)
+defer nlog.Shutdown(context.Background())
+```
+
+Call sites: `nlog.Info`/`Warn`/`Error` directly in handlers — fire-and-forget, never wrap in goroutines. Attach structured fields (`nikologs.Fields{"user_id": uid, "card_id": cid}`). An access-log middleware logs each request (`method`, `path`, `status`, `duration_ms`, `user_id`).
+
+Env: `NIKOLOGS_API_KEY` (`nk_...`). If unset, construct a no-op / stdout fallback client so dev without the key still works.
+
 ## Environment
 
 `.env.example`:
@@ -232,6 +250,7 @@ OAUTH_REDIRECT_URL=https://nikohub.dimitrije.dev/api/v1/auth/google/callback
 FRONTEND_URL=https://nikohub.dimitrije.dev
 COOKIE_DOMAIN=nikohub.dimitrije.dev
 COOKIE_SECURE=true
+NIKOLOGS_API_KEY=
 ```
 
 Dev values: `OAUTH_REDIRECT_URL=http://localhost:8080/api/v1/auth/google/callback`, `FRONTEND_URL=http://localhost:4200`, `COOKIE_DOMAIN=` (empty → host-only), `COOKIE_SECURE=false`.
