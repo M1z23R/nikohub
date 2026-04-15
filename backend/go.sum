@@ -1,2 +1,4 @@
 github.com/M1z23r/nikologs-go v1.0.0 h1:htlSJPX8qvpLF+TDQVnZosgniHbn1WOiEFORKa/WCL4=
 github.com/M1z23r/nikologs-go v1.0.0/go.mod h1:s91VG97J1ca06S9xUhkDSGWcQGXU/BwfF6bgQfV2DJY=
+github.com/lib/pq v1.12.3 h1:tTWxr2YLKwIvK90ZXEw8GP7UFHtcbTtty8zsI+YjrfQ=
+github.com/lib/pq v1.12.3/go.mod h1:/p+8NSbOcwzAEI7wiMXFlgydTwcgTr3OSKMsD2BitpA=
