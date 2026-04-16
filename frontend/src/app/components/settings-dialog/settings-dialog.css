@@ -1,0 +1,14 @@
+.settings { display: flex; flex-direction: column; gap: .85rem; }
+.hint { margin: 0 0 .25rem; font-size: .8rem; color: var(--ui-text-muted); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.row-head { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.row-dot { width: 14px; height: 14px; border-radius: 50%;
+  border: 1px solid rgba(0,0,0,.15); flex-shrink: 0; }
+.row-label { font-size: .9rem; color: var(--ui-text); }
+.swatches { display: flex; gap: .25rem; }
+.swatch { width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--ui-border); cursor: pointer; padding: 0; }
+.swatch.active { outline: 2px solid var(--ui-primary); outline-offset: 1px; }
+.swatch.picker { background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+  font-size: 0; line-height: 22px; color: transparent; }
+.footer { display: flex; justify-content: flex-end; gap: .5rem; }

@@ -12,6 +12,7 @@ import (
 	"github.com/m1z23r/drift/pkg/middleware"
 	"github.com/m1z23r/nikohub/internal/auth"
 	"github.com/m1z23r/nikohub/internal/cards"
+	"github.com/m1z23r/nikohub/internal/cardtypecolors"
 	"github.com/m1z23r/nikohub/internal/config"
 	"github.com/m1z23r/nikohub/internal/db"
 	"github.com/m1z23r/nikohub/internal/logx"
@@ -37,6 +38,7 @@ func main() {
 
 	userRepo := users.NewRepo(pg)
 	cardRepo := cards.NewRepo(pg)
+	colorRepo := cardtypecolors.NewRepo(pg)
 
 	authH := &auth.Handlers{
 		Cfg:   cfg,
@@ -46,6 +48,7 @@ func main() {
 		Log:   nlog,
 	}
 	cardH := &cards.Handlers{Repo: cardRepo, Log: nlog}
+	colorH := &cardtypecolors.Handlers{Repo: colorRepo, Log: nlog}
 
 	app := drift.New()
 	app.Use(
@@ -81,6 +84,8 @@ func main() {
 	api.Get("/cards/:id/image", auth.RequireAccessOrCookie(secret, pg), cardH.GetImage)
 	api.Get("/totps", auth.RequireAccess(secret), cardH.GetAllTOTP)
 	api.Get("/totps/:id", auth.RequireAccess(secret), cardH.GetTOTP)
+	api.Get("/card-type-colors", auth.RequireAccess(secret), colorH.List)
+	api.Patch("/card-type-colors/:cardType", auth.RequireAccess(secret), colorH.Patch)
 
 	nlog.Info("server starting", nikologs.Fields{"port": cfg.Port})
 	if err := app.Run(":" + cfg.Port); err != nil {

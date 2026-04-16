@@ -10,7 +10,8 @@ import {
   OnInit,
   OnDestroy,
 } from '@angular/core';
-import { ICard, CardService, CardPatch, getCardTypeColor } from '../../core/api/card.service';
+import { ICard, CardService, CardPatch } from '../../core/api/card.service';
+import { CardTypeColorsService } from '../../core/api/card-type-colors.service';
 import { SnapContext } from '../../core/snap';
 
 type DragMode = 'move' | 'resize' | null;
@@ -25,6 +26,7 @@ type DragMode = 'move' | 'resize' | null;
 export class CardComponent implements OnInit, OnDestroy {
   private cards = inject(CardService);
   private snapCtx = inject(SnapContext);
+  private colorsSvc = inject(CardTypeColorsService);
 
   @Input({ required: true }) card!: ICard;
   @Input() highlighted = false;
@@ -217,7 +219,7 @@ export class CardComponent implements OnInit, OnDestroy {
     if (this.card.card_type === 'container') {
       return `color-mix(in srgb, ${this.card.color} 20%, transparent)`;
     }
-    return getCardTypeColor(this.card);
+    return this.colorsSvc.resolve(this.card);
   }
 
   imageUrl(): string {

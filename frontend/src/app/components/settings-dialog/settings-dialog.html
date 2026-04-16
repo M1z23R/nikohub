@@ -1,0 +1,37 @@
+<ui-modal title="Card colors" size="sm">
+  <div class="settings">
+    <p class="hint">Pick a color for each card type. Containers keep their own per-card color.</p>
+
+    @for (row of rows; track row.key) {
+      <div class="row">
+        <div class="row-head">
+          <span class="row-dot" [style.background]="colors()[row.key]"></span>
+          <span class="row-label">{{ row.label }}</span>
+        </div>
+        <div class="swatches">
+          @for (preset of presets; track preset) {
+            <button
+              class="swatch"
+              [class.active]="colors()[row.key] === preset"
+              [style.background]="preset"
+              (click)="pick(row.key, preset)"
+              [attr.aria-label]="row.label + ' ' + preset"
+            ></button>
+          }
+          <button
+            class="swatch picker"
+            (click)="openPicker(row.key)"
+            aria-label="Custom color"
+          >+</button>
+        </div>
+      </div>
+    }
+
+    <input #cp type="color" (change)="onCustomColor($event)" style="display:none" />
+  </div>
+
+  <div footer class="footer">
+    <ui-button variant="ghost" size="sm" (clicked)="resetDefaults()">Reset to defaults</ui-button>
+    <ui-button size="sm" (clicked)="close()">Done</ui-button>
+  </div>
+</ui-modal>

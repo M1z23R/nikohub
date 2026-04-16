@@ -46,7 +46,7 @@
   box-shadow: var(--ui-shadow-lg); padding: .4rem .6rem;
   display: flex; align-items: center; gap: .5rem; align-self: flex-end; }
 .totp-float-wrap { position: relative; display: flex; align-items: center; justify-content: center;
-  --ui-primary: #4338ca; }
+  transition: color .3s; }
 .totp-float-timer { position: absolute; font-size: .55rem; font-weight: 700; color: var(--ui-text);
   pointer-events: none; }
 .totp-float-label { text-transform: uppercase; letter-spacing: .04em; color: var(--ui-text-muted);

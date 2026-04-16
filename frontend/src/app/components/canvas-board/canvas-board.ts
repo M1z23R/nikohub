@@ -1,7 +1,8 @@
 import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { ButtonComponent, CircularProgressComponent, InputComponent } from '@m1z23r/ngx-ui';
 import { CardComponent } from '../card/card';
-import { ICard, CardService, getCardTypeColor } from '../../core/api/card.service';
+import { ICard, CardService } from '../../core/api/card.service';
+import { CardTypeColorsService } from '../../core/api/card-type-colors.service';
 import { SnapContext, ISnapLine } from '../../core/snap';
 
 export interface EdgeIndicator {
@@ -29,6 +30,7 @@ type Menu =
 export class CanvasBoardComponent {
   private cards = inject(CardService);
   private snapCtx = inject(SnapContext);
+  private colorsSvc = inject(CardTypeColorsService);
   readonly colors = COLORS;
   readonly list = signal<ICard[]>([]);
   readonly menu = signal<Menu>(null);
@@ -147,7 +149,7 @@ export class CanvasBoardComponent {
         edge = cx < 0 ? 'left' : 'right';
       }
 
-      result.push({ x, y, color: getCardTypeColor(card), edge, cardId: card.id });
+      result.push({ x, y, color: this.colorsSvc.resolve(card), edge, cardId: card.id });
     }
     return result;
   });
@@ -160,7 +162,8 @@ export class CanvasBoardComponent {
   }
 
   async ngOnInit() {
-    this.list.set(await this.cards.list());
+    const [cards] = await Promise.all([this.cards.list(), this.colorsSvc.load()]);
+    this.list.set(cards);
     this.updateBoardSize();
     this.resizeObs = new ResizeObserver(() => this.updateBoardSize());
     this.resizeObs.observe(this.board.nativeElement);
@@ -199,6 +202,15 @@ export class CanvasBoardComponent {
   totpProgressPct(): number {
     return Math.round((this.totpRemaining() / 30) * 100);
   }
+
+  readonly totpColor = computed(() => {
+    const r = Math.max(0, Math.min(30, this.totpRemaining()));
+    let hue: number;
+    if (r <= 5) hue = (r / 5) * 15;
+    else if (r <= 10) hue = 15 + ((r - 5) / 5) * 25;
+    else hue = 40 + ((r - 10) / 20) * 80;
+    return `hsl(${hue}, 75%, 45%)`;
+  });
 
   private updateBoardSize() {
     const el = this.board.nativeElement;
@@ -686,7 +698,7 @@ export class CanvasBoardComponent {
   }
 
   favoriteDotColor(card: ICard): string {
-    return getCardTypeColor(card);
+    return this.colorsSvc.resolve(card);
   }
 
   private async copyToClipboard(text: string, favoriteId: string) {

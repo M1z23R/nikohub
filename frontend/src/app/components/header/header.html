@@ -9,6 +9,8 @@
           <span>{{ initial() }}</span>
         }
       </button>
+      <ui-dropdown-item (clicked)="openSettings()">Settings</ui-dropdown-item>
+      <ui-dropdown-divider />
       <ui-dropdown-item (clicked)="logout()">Logout</ui-dropdown-item>
     </ui-dropdown>
   </div>

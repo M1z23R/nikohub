@@ -95,9 +95,9 @@
     }
     @if (hasTotps()) {
       <div class="totp-float">
-        <div class="totp-float-wrap">
+        <div class="totp-float-wrap" [style.--ui-primary]="totpColor()">
           <ui-circular-progress [value]="totpProgressPct()" variant="primary" size="sm" [strokeWidth]="3" />
-          <span class="totp-float-timer">{{ totpRemaining() }}</span>
+          <span class="totp-float-timer" [style.color]="totpColor()">{{ totpRemaining() }}</span>
         </div>
         <span class="totp-float-label">TOTP</span>
       </div>
