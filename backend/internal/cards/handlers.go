@@ -205,6 +205,26 @@ func (h *Handlers) DeleteImage(c *drift.Context) {
 	c.Status(204)
 }
 
+func (h *Handlers) GetAllTOTP(c *drift.Context) {
+	uid := auth.UserID(c)
+	secrets, err := h.Repo.GetAllSecrets(uid)
+	if err != nil {
+		httpx.Err(c, 500, "read failed")
+		return
+	}
+	now := time.Now()
+	codes := make(map[string]TotpBatchEntry, len(secrets))
+	for id, secret := range secrets {
+		code, err := GenerateTOTP(secret, now)
+		if err != nil {
+			continue
+		}
+		codes[id.String()] = TotpBatchEntry{Code: code}
+	}
+	remaining := 30 - int(now.Unix()%30)
+	c.JSON(200, TotpBatchResponse{Codes: codes, Remaining: remaining, Period: 30})
+}
+
 func (h *Handlers) GetTOTP(c *drift.Context) {
 	uid := auth.UserID(c)
 	id, err := uuid.Parse(c.Param("id"))

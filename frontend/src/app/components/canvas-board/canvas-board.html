@@ -13,6 +13,7 @@
         [scale]="scale()"
         [highlighted]="highlightedContainerId() === c.id"
         [isSelected]="selected().has(c.id)"
+        [totpCode]="totpCodes()[c.id] ?? ''"
         (changed)="replaceLocally($event)"
         (dropped)="onCardDropped($event)"
         (moveStarted)="onCardDragStart($event)"
@@ -79,35 +80,11 @@
     @if (m.kind === 'empty') {
       @if (menuStep() === 'type') {
         <div class="label">New card</div>
-        <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('note-color')">Note</ui-button>
-        <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('secret-color')">Secret note</ui-button>
-        <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('image-color')">Image</ui-button>
+        <ui-button variant="ghost" size="sm" (clicked)="createNoteAt()">Note</ui-button>
+        <ui-button variant="ghost" size="sm" (clicked)="createSecretNoteAt()">Secret note</ui-button>
+        <ui-button variant="ghost" size="sm" (clicked)="createImageAt()">Image</ui-button>
         <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('totp-form')">TOTP</ui-button>
         <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('container-color')">Container</ui-button>
-      } @else if (menuStep() === 'note-color') {
-        <div class="label">Pick color</div>
-        <div class="swatches">
-          @for (color of colors; track color) {
-            <button class="swatch" [style.background]="color" (click)="createNoteAt(color)"></button>
-          }
-          <button class="swatch picker" (click)="openColorPicker(createNoteAt.bind(this))">+</button>
-        </div>
-      } @else if (menuStep() === 'secret-color') {
-        <div class="label">Pick color</div>
-        <div class="swatches">
-          @for (color of colors; track color) {
-            <button class="swatch" [style.background]="color" (click)="createNoteAt(color, true)"></button>
-          }
-          <button class="swatch picker" (click)="openColorPicker(createSecretNoteAt.bind(this))">+</button>
-        </div>
-      } @else if (menuStep() === 'image-color') {
-        <div class="label">Pick color</div>
-        <div class="swatches">
-          @for (color of colors; track color) {
-            <button class="swatch" [style.background]="color" (click)="createImageAt(color)"></button>
-          }
-          <button class="swatch picker" (click)="openColorPicker(createImageAt.bind(this))">+</button>
-        </div>
       } @else if (menuStep() === 'container-color') {
         <div class="label">Pick color</div>
         <div class="swatches">
@@ -125,22 +102,22 @@
         </div>
       }
     } @else {
-      <div class="label">Color</div>
-      <div class="swatches">
-        @for (color of colors; track color) {
-          <button class="swatch" [style.background]="color" (click)="changeCardColor(color)"></button>
-        }
-        <button class="swatch picker" (click)="openColorPicker(changeCardColor.bind(this))">+</button>
-      </div>
+      @if (m.card.card_type === 'container') {
+        <div class="label">Color</div>
+        <div class="swatches">
+          @for (color of colors; track color) {
+            <button class="swatch" [style.background]="color" (click)="changeCardColor(color)"></button>
+          }
+          <button class="swatch picker" (click)="openColorPicker(changeCardColor.bind(this))">+</button>
+        </div>
+        <ui-button variant="ghost" size="sm" (clicked)="autoOrganizeContainer()">Auto-organize</ui-button>
+      }
       @if (m.card.card_type === 'image') {
         <ui-button variant="ghost" size="sm" (clicked)="triggerUpload()">Upload image</ui-button>
         <input #fi type="file" accept="image/*" (change)="uploadImage($event)" style="display:none" />
         @if (m.card.has_image) {
           <ui-button variant="ghost" size="sm" (clicked)="removeImage()">Remove image</ui-button>
         }
-      }
-      @if (m.card.card_type === 'container') {
-        <ui-button variant="ghost" size="sm" (clicked)="autoOrganizeContainer()">Auto-organize</ui-button>
       }
       <ui-button variant="ghost" color="danger" size="sm" (clicked)="deleteCard()">Delete</ui-button>
     }

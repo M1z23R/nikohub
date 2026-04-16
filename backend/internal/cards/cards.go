@@ -19,6 +19,16 @@ type TotpCode struct {
 	Period    int    `json:"period"`
 }
 
+type TotpBatchEntry struct {
+	Code string `json:"code"`
+}
+
+type TotpBatchResponse struct {
+	Codes     map[string]TotpBatchEntry `json:"codes"`
+	Remaining int                       `json:"remaining"`
+	Period    int                       `json:"period"`
+}
+
 func GenerateTOTP(secret string, t time.Time) (string, error) {
 	secret = strings.TrimSpace(strings.ToUpper(secret))
 	secret = strings.ReplaceAll(secret, " ", "")
@@ -55,6 +65,26 @@ func (r *Repo) GetSecret(userID, id uuid.UUID) (string, error) {
 		return "", sql.ErrNoRows
 	}
 	return secret.String, nil
+}
+
+func (r *Repo) GetAllSecrets(userID uuid.UUID) (map[uuid.UUID]string, error) {
+	rows, err := r.db.Query(
+		`SELECT id, totp_secret FROM cards WHERE user_id=$1 AND card_type='totp' AND totp_secret IS NOT NULL`, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[uuid.UUID]string)
+	for rows.Next() {
+		var id uuid.UUID
+		var secret string
+		if err := rows.Scan(&id, &secret); err != nil {
+			return nil, err
+		}
+		out[id] = secret
+	}
+	return out, rows.Err()
 }
 
 type Card struct {
@@ -119,13 +149,16 @@ func scanCard(row interface{ Scan(...any) error }, c *Card) error {
 }
 
 func (r *Repo) Create(userID uuid.UUID, in CreateInput) (*Card, error) {
-	color := in.Color
-	if color == "" {
-		color = "#fde68a"
-	}
 	cardType := in.CardType
 	if cardType == "" {
 		cardType = "note"
+	}
+	color := in.Color
+	if color == "" && cardType == "container" {
+		color = "#fde68a"
+	}
+	if cardType != "container" {
+		color = ""
 	}
 	width := in.Width
 	if width <= 0 {

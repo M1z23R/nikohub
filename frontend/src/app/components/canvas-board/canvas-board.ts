@@ -1,7 +1,7 @@
 import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { ButtonComponent, CircularProgressComponent, InputComponent } from '@m1z23r/ngx-ui';
 import { CardComponent } from '../card/card';
-import { ICard, CardService } from '../../core/api/card.service';
+import { ICard, CardService, getCardTypeColor } from '../../core/api/card.service';
 import { SnapContext, ISnapLine } from '../../core/snap';
 
 export interface EdgeIndicator {
@@ -32,7 +32,7 @@ export class CanvasBoardComponent {
   readonly colors = COLORS;
   readonly list = signal<ICard[]>([]);
   readonly menu = signal<Menu>(null);
-  readonly menuStep = signal<'type' | 'note-color' | 'secret-color' | 'image-color' | 'totp-form' | 'container-color'>('type');
+  readonly menuStep = signal<'type' | 'totp-form' | 'container-color'>('type');
   readonly highlightedContainerId = signal<string | null>(null);
   totpFormName = '';
   totpFormSecret = '';
@@ -87,7 +87,8 @@ export class CanvasBoardComponent {
 
   readonly hasTotps = computed(() => this.list().some((c) => c.card_type === 'totp'));
   readonly totpRemaining = signal(30);
-  private totpTicker: ReturnType<typeof setInterval> | null = null;
+  readonly totpCodes = signal<Record<string, string>>({});
+  private totpTimer: ReturnType<typeof setInterval> | null = null;
 
   readonly indicators = computed<EdgeIndicator[]>(() => {
     const px = this.panX();
@@ -130,7 +131,7 @@ export class CanvasBoardComponent {
         edge = cx < 0 ? 'left' : 'right';
       }
 
-      result.push({ x, y, color: card.color, edge, cardId: card.id });
+      result.push({ x, y, color: getCardTypeColor(card), edge, cardId: card.id });
     }
     return result;
   });
@@ -147,18 +148,35 @@ export class CanvasBoardComponent {
     this.updateBoardSize();
     this.resizeObs = new ResizeObserver(() => this.updateBoardSize());
     this.resizeObs.observe(this.board.nativeElement);
-    this.tickTotp();
-    this.totpTicker = setInterval(() => this.tickTotp(), 1000);
+    await this.fetchAllTotp();
+    this.totpTimer = setInterval(() => this.tickTotp(), 1000);
   }
 
   ngOnDestroy() {
     this.resizeObs?.disconnect();
-    if (this.totpTicker) clearInterval(this.totpTicker);
+    if (this.totpTimer) clearInterval(this.totpTimer);
+  }
+
+  private async fetchAllTotp() {
+    if (!this.hasTotps()) return;
+    try {
+      const res = await this.cards.getAllTotp();
+      this.totpCodes.set(
+        Object.fromEntries(Object.entries(res.codes).map(([id, e]) => [id, e.code])),
+      );
+      this.totpRemaining.set(res.remaining);
+    } catch (e) {
+      console.error('totp batch fetch failed', e);
+    }
   }
 
   private tickTotp() {
-    const sec = Math.floor(Date.now() / 1000);
-    this.totpRemaining.set(30 - (sec % 30));
+    const r = this.totpRemaining();
+    if (r <= 1) {
+      this.fetchAllTotp();
+    } else {
+      this.totpRemaining.set(r - 1);
+    }
   }
 
   totpProgressPct(): number {
@@ -334,25 +352,25 @@ export class CanvasBoardComponent {
     );
   }
 
-  async createSecretNoteAt(color: string) {
-    return this.createNoteAt(color, true);
+  async createSecretNoteAt() {
+    return this.createNoteAt(true);
   }
 
-  async createNoteAt(color: string, isSecret = false) {
+  async createNoteAt(isSecret = false) {
     const m = this.menu();
     if (!m || m.kind !== 'empty') return;
     const created = await this.cards.create({
-      x: Math.round(m.canvasX), y: Math.round(m.canvasY), color,
+      x: Math.round(m.canvasX), y: Math.round(m.canvasY),
       ...(isSecret ? { is_secret: true } : {}),
     });
     this.list.update((xs) => [...xs, created]);
     this.closeMenu();
   }
 
-  async createImageAt(color: string) {
+  async createImageAt() {
     const m = this.menu();
     if (!m || m.kind !== 'empty') return;
-    const created = await this.cards.create({ x: Math.round(m.canvasX), y: Math.round(m.canvasY), color, card_type: 'image' });
+    const created = await this.cards.create({ x: Math.round(m.canvasX), y: Math.round(m.canvasY), card_type: 'image' });
     this.list.update((xs) => [...xs, created]);
     this.closeMenu();
     setTimeout(() => {
@@ -373,6 +391,7 @@ export class CanvasBoardComponent {
     });
     this.list.update((xs) => [...xs, created]);
     this.closeMenu();
+    this.fetchAllTotp();
   }
 
   async createContainerAt(color: string) {
@@ -425,7 +444,15 @@ export class CanvasBoardComponent {
     const newWidth = 2 * PAD + cols * cardW + (cols - 1) * GAP;
     const newHeight = HEADER + 2 * PAD + rows * cardH + (rows - 1) * GAP;
 
-    const sorted = [...children].sort((a, b) => a.y - b.y || a.x - b.x);
+    const typeOrder = (c: ICard): number => {
+      if (c.card_type === 'note') return c.is_secret ? 1 : 0;
+      if (c.card_type === 'image') return 2;
+      if (c.card_type === 'totp') return 3;
+      return 4;
+    };
+    const sorted = [...children].sort(
+      (a, b) => typeOrder(a) - typeOrder(b) || a.y - b.y || a.x - b.x,
+    );
     const updates = new Map<string, ICard>();
     const patches: Promise<ICard>[] = [];
 

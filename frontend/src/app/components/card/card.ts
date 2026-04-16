@@ -10,7 +10,7 @@ import {
   OnInit,
   OnDestroy,
 } from '@angular/core';
-import { ICard, CardService, CardPatch } from '../../core/api/card.service';
+import { ICard, CardService, CardPatch, getCardTypeColor } from '../../core/api/card.service';
 import { SnapContext } from '../../core/snap';
 
 type DragMode = 'move' | 'resize' | null;
@@ -30,6 +30,7 @@ export class CardComponent implements OnInit, OnDestroy {
   @Input() highlighted = false;
   @Input() isSelected = false;
   @Input() scale = 1;
+  @Input() totpCode = '';
   @Output() changed = new EventEmitter<ICard>();
   @Output() deleted = new EventEmitter<string>();
   @Output() dropped = new EventEmitter<ICard>();
@@ -43,11 +44,6 @@ export class CardComponent implements OnInit, OnDestroy {
   @ViewChild('ta') ta?: ElementRef<HTMLTextAreaElement>;
   @ViewChild('titleInput') titleInput?: ElementRef<HTMLInputElement>;
 
-  readonly totpCode = signal('');
-  readonly totpRemaining = signal(0);
-  readonly totpPeriod = signal(30);
-
-  private totpTimer: ReturnType<typeof setInterval> | null = null;
   private copiedTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private mode: DragMode = null;
@@ -62,21 +58,9 @@ export class CardComponent implements OnInit, OnDestroy {
     if (this.card.is_secret && !this.card.text) {
       this.revealed.set(true);
     }
-    if (this.card.card_type === 'totp') {
-      this.fetchTotp();
-      this.totpTimer = setInterval(() => {
-        const r = this.totpRemaining();
-        if (r <= 1) {
-          this.fetchTotp();
-        } else {
-          this.totpRemaining.set(r - 1);
-        }
-      }, 1000);
-    }
   }
 
   ngOnDestroy() {
-    if (this.totpTimer) clearInterval(this.totpTimer);
     if (this.copiedTimeout) clearTimeout(this.copiedTimeout);
   }
 
@@ -89,7 +73,7 @@ export class CardComponent implements OnInit, OnDestroy {
   }
 
   async copyText() {
-    const text = this.card.card_type === 'totp' ? this.totpCode() : this.card.text;
+    const text = this.card.card_type === 'totp' ? this.totpCode : this.card.text;
     if (!text) return;
     await navigator.clipboard.writeText(text);
     this.copied.set(true);
@@ -106,20 +90,9 @@ export class CardComponent implements OnInit, OnDestroy {
   }
 
   formattedTotp(): string {
-    const code = this.totpCode();
+    const code = this.totpCode;
     if (code.length === 6) return code.slice(0, 3) + ' ' + code.slice(3);
     return code;
-  }
-
-  private async fetchTotp() {
-    try {
-      const res = await this.cards.getTotp(this.card.id);
-      this.totpCode.set(res.code);
-      this.totpRemaining.set(res.remaining);
-      this.totpPeriod.set(res.period);
-    } catch (e) {
-      console.error('totp fetch failed', e);
-    }
   }
 
   onHeaderPointerDown(ev: PointerEvent) {
@@ -234,7 +207,7 @@ export class CardComponent implements OnInit, OnDestroy {
     if (this.card.card_type === 'container') {
       return `color-mix(in srgb, ${this.card.color} 20%, transparent)`;
     }
-    return this.card.color;
+    return getCardTypeColor(this.card);
   }
 
   imageUrl(): string {

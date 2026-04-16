@@ -73,6 +73,7 @@ func main() {
 	secret := []byte(cfg.JWTSecret)
 	api.Get("/me", auth.RequireAccess(secret), authH.Me)
 	api.Get("/cards", auth.RequireAccess(secret), cardH.List)
+	api.Get("/cards/totp", auth.RequireAccess(secret), cardH.GetAllTOTP)
 	api.Post("/cards", auth.RequireAccess(secret), cardH.Create)
 	api.Patch("/cards/:id", auth.RequireAccess(secret), cardH.Patch)
 	api.Delete("/cards/:id", auth.RequireAccess(secret), cardH.Delete)

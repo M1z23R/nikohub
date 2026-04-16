@@ -21,8 +21,29 @@ export interface ICard {
   updated_at: string;
 }
 
+export const CARD_TYPE_COLORS = {
+  note: '#fde68a',
+  secret: '#fbcfe8',
+  image: '#bfdbfe',
+  totp: '#bbf7d0',
+} as const;
+
+export function getCardTypeColor(card: ICard): string {
+  if (card.card_type === 'container') return card.color;
+  if (card.is_secret) return CARD_TYPE_COLORS.secret;
+  if (card.card_type === 'image') return CARD_TYPE_COLORS.image;
+  if (card.card_type === 'totp') return CARD_TYPE_COLORS.totp;
+  return CARD_TYPE_COLORS.note;
+}
+
 export interface ITotpCode {
   code: string;
+  remaining: number;
+  period: number;
+}
+
+export interface ITotpBatchResponse {
+  codes: Record<string, { code: string }>;
   remaining: number;
   period: number;
 }
@@ -71,6 +92,10 @@ export class CardService {
 
   getTotp(id: string): Promise<ITotpCode> {
     return firstValueFrom(this.http.get<ITotpCode>(`${this.base}/${id}/totp`));
+  }
+
+  getAllTotp(): Promise<ITotpBatchResponse> {
+    return firstValueFrom(this.http.get<ITotpBatchResponse>(`${this.base}/totp`));
   }
 
   imageUrl(id: string, updatedAt: string): string {
