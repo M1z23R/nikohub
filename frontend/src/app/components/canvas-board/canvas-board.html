@@ -48,13 +48,26 @@
   }
 </div>
 
-@if (containers().length) {
-  <div class="bookmarks">
-    @for (c of containers(); track c.id) {
-      <button class="bookmark" (click)="navigateToCard(c)">
-        <span class="bookmark-dot" [style.background]="c.color"></span>
-        {{ c.text || 'Container' }}
-      </button>
+@if (containers().length || hasTotps()) {
+  <div class="sidebar">
+    @if (containers().length) {
+      <div class="bookmarks">
+        @for (c of containers(); track c.id) {
+          <button class="bookmark" (click)="navigateToCard(c)">
+            <span class="bookmark-dot" [style.background]="c.color"></span>
+            {{ c.text || 'Container' }}
+          </button>
+        }
+      </div>
+    }
+    @if (hasTotps()) {
+      <div class="totp-float">
+        <div class="totp-float-wrap">
+          <ui-circular-progress [value]="totpProgressPct()" variant="primary" size="sm" [strokeWidth]="3" />
+          <span class="totp-float-timer">{{ totpRemaining() }}</span>
+        </div>
+        <span class="totp-float-label">TOTP</span>
+      </div>
     }
   </div>
 }
@@ -125,6 +138,9 @@
         @if (m.card.has_image) {
           <ui-button variant="ghost" size="sm" (clicked)="removeImage()">Remove image</ui-button>
         }
+      }
+      @if (m.card.card_type === 'container') {
+        <ui-button variant="ghost" size="sm" (clicked)="autoOrganizeContainer()">Auto-organize</ui-button>
       }
       <ui-button variant="ghost" color="danger" size="sm" (clicked)="deleteCard()">Delete</ui-button>
     }

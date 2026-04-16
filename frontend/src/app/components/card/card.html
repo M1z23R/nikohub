@@ -33,10 +33,6 @@
     <div class="totp-body" (click)="copyText()">
       <div class="totp-name">{{ card.totp_name }}</div>
       <div class="totp-row">
-        <div class="totp-progress-wrap">
-          <ui-circular-progress [value]="totpProgressPct()" variant="primary" size="sm" [strokeWidth]="3" />
-          <span class="totp-timer">{{ totpRemaining() }}</span>
-        </div>
         <div class="totp-code">
           @if (revealed()) {
             {{ formattedTotp() }}

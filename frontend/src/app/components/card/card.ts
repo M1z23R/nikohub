@@ -10,7 +10,6 @@ import {
   OnInit,
   OnDestroy,
 } from '@angular/core';
-import { CircularProgressComponent } from '@m1z23r/ngx-ui';
 import { ICard, CardService, CardPatch } from '../../core/api/card.service';
 import { SnapContext } from '../../core/snap';
 
@@ -19,7 +18,7 @@ type DragMode = 'move' | 'resize' | null;
 @Component({
   selector: 'app-card',
   standalone: true,
-  imports: [CircularProgressComponent],
+  imports: [],
   templateUrl: './card.html',
   styleUrl: './card.css',
 })
@@ -121,11 +120,6 @@ export class CardComponent implements OnInit, OnDestroy {
     } catch (e) {
       console.error('totp fetch failed', e);
     }
-  }
-
-  totpProgressPct(): number {
-    const period = this.totpPeriod() || 30;
-    return Math.round((this.totpRemaining() / period) * 100);
   }
 
   onHeaderPointerDown(ev: PointerEvent) {

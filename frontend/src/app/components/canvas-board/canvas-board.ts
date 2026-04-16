@@ -1,5 +1,5 @@
 import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
-import { ButtonComponent, InputComponent } from '@m1z23r/ngx-ui';
+import { ButtonComponent, CircularProgressComponent, InputComponent } from '@m1z23r/ngx-ui';
 import { CardComponent } from '../card/card';
 import { ICard, CardService } from '../../core/api/card.service';
 import { SnapContext, ISnapLine } from '../../core/snap';
@@ -22,7 +22,7 @@ type Menu =
 @Component({
   selector: 'app-canvas-board',
   standalone: true,
-  imports: [CardComponent, ButtonComponent, InputComponent],
+  imports: [CardComponent, ButtonComponent, CircularProgressComponent, InputComponent],
   templateUrl: './canvas-board.html',
   styleUrl: './canvas-board.css',
 })
@@ -66,6 +66,10 @@ export class CanvasBoardComponent {
   readonly containers = computed(() =>
     this.list().filter((c) => c.card_type === 'container'),
   );
+
+  readonly hasTotps = computed(() => this.list().some((c) => c.card_type === 'totp'));
+  readonly totpRemaining = signal(30);
+  private totpTicker: ReturnType<typeof setInterval> | null = null;
 
   readonly indicators = computed<EdgeIndicator[]>(() => {
     const px = this.panX();
@@ -118,10 +122,22 @@ export class CanvasBoardComponent {
     this.updateBoardSize();
     this.resizeObs = new ResizeObserver(() => this.updateBoardSize());
     this.resizeObs.observe(this.board.nativeElement);
+    this.tickTotp();
+    this.totpTicker = setInterval(() => this.tickTotp(), 1000);
   }
 
   ngOnDestroy() {
     this.resizeObs?.disconnect();
+    if (this.totpTicker) clearInterval(this.totpTicker);
+  }
+
+  private tickTotp() {
+    const sec = Math.floor(Date.now() / 1000);
+    this.totpRemaining.set(30 - (sec % 30));
+  }
+
+  totpProgressPct(): number {
+    return Math.round((this.totpRemaining() / 30) * 100);
   }
 
   private updateBoardSize() {
@@ -362,6 +378,54 @@ export class CanvasBoardComponent {
     if (card.z_index === maxZ) return;
     this.list.update((xs) => xs.map((c) => (c.id === card.id ? { ...c, z_index: maxZ + 1 } : c)));
     await this.cards.patch(card.id, { z_index: maxZ + 1 });
+  }
+
+  async autoOrganizeContainer() {
+    const m = this.menu();
+    if (!m || m.kind !== 'card' || m.card.card_type !== 'container') return;
+    const container = m.card;
+    const children = this.list().filter((c) => c.container_id === container.id);
+    if (children.length === 0) {
+      this.closeMenu();
+      return;
+    }
+
+    const PAD = 24;
+    const GAP = 16;
+    const HEADER = 48;
+    const cols = Math.ceil(Math.sqrt(children.length));
+    const rows = Math.ceil(children.length / cols);
+    const cardW = Math.max(...children.map((c) => c.width));
+    const cardH = Math.max(...children.map((c) => c.height));
+    const newWidth = 2 * PAD + cols * cardW + (cols - 1) * GAP;
+    const newHeight = HEADER + 2 * PAD + rows * cardH + (rows - 1) * GAP;
+
+    const sorted = [...children].sort((a, b) => a.y - b.y || a.x - b.x);
+    const updates = new Map<string, ICard>();
+    const patches: Promise<ICard>[] = [];
+
+    sorted.forEach((c, i) => {
+      const r = Math.floor(i / cols);
+      const col = i % cols;
+      const x = container.x + PAD + col * (cardW + GAP);
+      const y = container.y + HEADER + PAD + r * (cardH + GAP);
+      updates.set(c.id, { ...c, x, y, width: cardW, height: cardH });
+      patches.push(this.cards.patch(c.id, { x, y, width: cardW, height: cardH }));
+    });
+
+    updates.set(container.id, { ...container, width: newWidth, height: newHeight });
+    patches.push(this.cards.patch(container.id, { width: newWidth, height: newHeight }));
+
+    this.list.update((xs) => xs.map((c) => updates.get(c.id) ?? c));
+    this.closeMenu();
+
+    try {
+      const results = await Promise.all(patches);
+      const mResults = new Map(results.map((r) => [r.id, r]));
+      this.list.update((xs) => xs.map((c) => mResults.get(c.id) ?? c));
+    } catch (e) {
+      console.error('auto-organize failed', e);
+    }
   }
 
   async deleteCard() {

@@ -36,9 +36,6 @@
 .totp-row { display: flex; align-items: center; gap: .5rem; }
 .totp-code { font-family: 'Courier New', monospace; font-size: 1.5rem; font-weight: 700; letter-spacing: .2em;
   color: #111827; padding: .25rem .5rem; }
-.totp-progress-wrap { position: relative; display: flex; align-items: center; justify-content: center;
-  --ui-primary: #6366f1; }
-.totp-timer { position: absolute; font-size: .55rem; font-weight: 700; color: #374151; pointer-events: none; }
 .totp-copied { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center;
   font-size: .65rem; color: #059669; font-weight: 500; }
 
