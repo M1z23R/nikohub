@@ -1,0 +1,38 @@
+<div #board class="board" (contextmenu)="onBackgroundContextMenu($event)" (click)="closeMenu()">
+  <div class="sheet">
+    @for (c of list(); track c.id) {
+      <app-card
+        [card]="c"
+        (changed)="replaceLocally($event)"
+        (contextRequested)="onCardContextRequested($event)"
+        (click)="bringToFront(c)"
+      />
+    }
+  </div>
+</div>
+
+@if (menu(); as m) {
+  <div class="menu" [style.left.px]="m.x" [style.top.px]="m.y" (click)="$event.stopPropagation()">
+    @if (m.kind === 'empty') {
+      <div class="label">New note</div>
+      <div class="swatches">
+        @for (color of colors; track color) {
+          <button class="swatch" [style.background]="color" (click)="createAt(color)"></button>
+        }
+      </div>
+    } @else {
+      <div class="label">Color</div>
+      <div class="swatches">
+        @for (color of colors; track color) {
+          <button class="swatch" [style.background]="color" (click)="changeCardColor(color)"></button>
+        }
+      </div>
+      <button class="item" (click)="triggerUpload()">Upload image</button>
+      <input #fi type="file" accept="image/*" (change)="uploadImage($event)" style="display:none" />
+      @if (m.card.has_image) {
+        <button class="item" (click)="removeImage()">Remove image</button>
+      }
+      <button class="item danger" (click)="deleteCard()">Delete</button>
+    }
+  </div>
+}

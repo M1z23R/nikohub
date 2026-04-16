@@ -1,8 +1,14 @@
 import { Component } from '@angular/core';
+import { HeaderComponent } from '../../components/header/header';
+import { CanvasBoardComponent } from '../../components/canvas-board/canvas-board';
 
 @Component({
-  selector: 'app-canvas',
+  selector: 'app-canvas-page',
   standalone: true,
-  template: '<div>Canvas (coming soon)</div>',
+  imports: [HeaderComponent, CanvasBoardComponent],
+  template: `
+    <app-header />
+    <app-canvas-board />
+  `,
 })
 export class CanvasPage {}
