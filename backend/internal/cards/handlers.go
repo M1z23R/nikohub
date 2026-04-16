@@ -78,6 +78,7 @@ type patchReq struct {
 	Text        *string `json:"text,omitempty"`
 	Title       *string `json:"title,omitempty"`
 	IsSecret    *bool   `json:"is_secret,omitempty"`
+	IsFavorite  *bool   `json:"is_favorite,omitempty"`
 	ContainerID *string `json:"container_id,omitempty"`
 }
 
@@ -111,7 +112,7 @@ func (h *Handlers) Patch(c *drift.Context) {
 
 	card, err := h.Repo.Update(uid, id, UpdateInput{
 		X: in.X, Y: in.Y, Width: in.Width, Height: in.Height, ZIndex: in.ZIndex,
-		Color: in.Color, Text: in.Text, Title: in.Title, IsSecret: in.IsSecret,
+		Color: in.Color, Text: in.Text, Title: in.Title, IsSecret: in.IsSecret, IsFavorite: in.IsFavorite,
 		ContainerID: containerID, ClearContainerID: clearContainerID,
 	})
 	if err == sql.ErrNoRows {

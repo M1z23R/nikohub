@@ -36,6 +36,8 @@
 .bookmark:hover { background: var(--ui-bg-secondary); }
 .bookmark-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
   border: 1px solid rgba(0,0,0,.15); }
+.bookmark-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.bookmark-copied { font-size: .65rem; font-weight: 600; color: #059669; margin-left: auto; flex-shrink: 0; }
 .totp-float { background: var(--ui-bg); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md);
   box-shadow: var(--ui-shadow-lg); padding: .4rem .6rem;
   display: flex; align-items: center; gap: .5rem; align-self: flex-end; }

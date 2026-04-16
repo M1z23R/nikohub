@@ -6,6 +6,11 @@
   align-items: center; opacity: .45; transition: opacity .15s; }
 .eye-btn:hover { opacity: .85; }
 .eye-btn svg { width: 14px; height: 14px; }
+.star-btn { background: transparent; border: none; cursor: pointer; padding: 1px 3px; display: flex;
+  align-items: center; opacity: .35; transition: opacity .15s, color .15s; color: inherit; margin-right: auto; }
+.star-btn:hover { opacity: .85; }
+.star-btn.active { opacity: 1; color: #f59e0b; }
+.star-btn svg { width: 14px; height: 14px; }
 .img { width:100%; flex: 1; object-fit: cover; }
 .text { flex:1; padding: .5rem .75rem; font-size: .9rem; color: #1f2937; white-space: pre-wrap;
   outline: none; border: none; background: transparent; resize: none; font-family: inherit; }
@@ -38,6 +43,10 @@
   color: #111827; padding: .25rem .5rem; }
 .totp-copied { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center;
   font-size: .65rem; color: #059669; font-weight: 500; }
+
+/* Password — revealed state is a click-to-copy target, not a text editor */
+.password-text { position: relative; cursor: pointer; user-select: none; }
+.password-text:active { opacity: .7; }
 
 /* Container */
 .card.container { border: 2px dashed rgba(0,0,0,.15); box-shadow: none; border-radius: var(--ui-radius-lg);

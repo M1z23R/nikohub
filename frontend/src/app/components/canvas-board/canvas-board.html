@@ -14,6 +14,7 @@
         [highlighted]="highlightedContainerId() === c.id"
         [isSelected]="selected().has(c.id)"
         [totpCode]="totpCodes()[c.id]"
+        [revealToken]="revealToken()"
         (changed)="replaceLocally($event)"
         (dropped)="onCardDropped($event)"
         (moveStarted)="onCardDragStart($event)"
@@ -49,7 +50,7 @@
   }
 </div>
 
-@if (containers().length || hasTotps()) {
+@if (containers().length || favorites().length || hasTotps()) {
   <div class="sidebar">
     @if (containers().length) {
       <div class="bookmarks">
@@ -57,6 +58,19 @@
           <button class="bookmark" (click)="navigateToCard(c)">
             <span class="bookmark-dot" [style.background]="c.color"></span>
             {{ c.text || 'Container' }}
+          </button>
+        }
+      </div>
+    }
+    @if (favorites().length) {
+      <div class="bookmarks favorites">
+        @for (c of favorites(); track c.id) {
+          <button class="bookmark" (click)="onFavoriteClick(c)">
+            <span class="bookmark-dot" [style.background]="favoriteDotColor(c)"></span>
+            <span class="bookmark-label">{{ favoriteLabel(c) }}</span>
+            @if (copiedFavoriteId() === c.id) {
+              <span class="bookmark-copied">Copied</span>
+            }
           </button>
         }
       </div>
@@ -84,6 +98,7 @@
         <ui-button variant="ghost" size="sm" (clicked)="createSecretNoteAt()">Secret note</ui-button>
         <ui-button variant="ghost" size="sm" (clicked)="createImageAt()">Image</ui-button>
         <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('totp-form')">TOTP</ui-button>
+        <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('password-form')">Password</ui-button>
         <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('container-color')">Container</ui-button>
       } @else if (menuStep() === 'container-color') {
         <div class="label">Pick color</div>
@@ -99,6 +114,13 @@
           <ui-input placeholder="Name" [(value)]="totpFormName" />
           <ui-input placeholder="Secret" [(value)]="totpFormSecret" />
           <ui-button size="sm" [disabled]="!totpFormName.trim() || !totpFormSecret.trim()" (clicked)="createTotpAt()">Create</ui-button>
+        </div>
+      } @else if (menuStep() === 'password-form') {
+        <div class="label">New Password</div>
+        <div class="totp-form">
+          <ui-input placeholder="Name" [(value)]="passwordFormName" />
+          <ui-input placeholder="Password" [(value)]="passwordFormValue" />
+          <ui-button size="sm" [disabled]="!passwordFormName.trim() || !passwordFormValue" (clicked)="createPasswordAt()">Create</ui-button>
         </div>
       }
     } @else {

@@ -99,6 +99,7 @@ type Card struct {
 	ZIndex      int        `json:"z_index"`
 	CardType    string     `json:"card_type"`
 	IsSecret    bool       `json:"is_secret"`
+	IsFavorite  bool       `json:"is_favorite"`
 	TotpName    string     `json:"totp_name,omitempty"`
 	ContainerID *uuid.UUID `json:"container_id"`
 	Title       string     `json:"title"`
@@ -137,11 +138,11 @@ type CreateInput struct {
 	TotpName            string
 }
 
-const returnCols = `id,x,y,width,height,color,text,(image_data IS NOT NULL),z_index,card_type,is_secret,COALESCE(totp_name,''),container_id,title,updated_at`
+const returnCols = `id,x,y,width,height,color,text,(image_data IS NOT NULL),z_index,card_type,is_secret,is_favorite,COALESCE(totp_name,''),container_id,title,updated_at`
 
 func scanCard(row interface{ Scan(...any) error }, c *Card) error {
 	var containerID uuid.NullUUID
-	err := row.Scan(&c.ID, &c.X, &c.Y, &c.Width, &c.Height, &c.Color, &c.Text, &c.HasImage, &c.ZIndex, &c.CardType, &c.IsSecret, &c.TotpName, &containerID, &c.Title, &c.UpdatedAt)
+	err := row.Scan(&c.ID, &c.X, &c.Y, &c.Width, &c.Height, &c.Color, &c.Text, &c.HasImage, &c.ZIndex, &c.CardType, &c.IsSecret, &c.IsFavorite, &c.TotpName, &containerID, &c.Title, &c.UpdatedAt)
 	if containerID.Valid {
 		c.ContainerID = &containerID.UUID
 	}
@@ -190,6 +191,7 @@ type UpdateInput struct {
 	X, Y, Width, Height, ZIndex *int
 	Color, Text, Title          *string
 	IsSecret                    *bool
+	IsFavorite                  *bool
 	ContainerID                 *uuid.UUID
 	ClearContainerID            bool
 }
@@ -207,12 +209,13 @@ func (r *Repo) Update(userID, id uuid.UUID, in UpdateInput) (*Card, error) {
 		  text = COALESCE($9,text),
 		  title = COALESCE($10,title),
 		  is_secret = COALESCE($11,is_secret),
+		  is_favorite = COALESCE($14,is_favorite),
 		  container_id = CASE WHEN $13 THEN NULL WHEN $12::uuid IS NOT NULL THEN $12::uuid ELSE container_id END,
 		  updated_at = now()
 		WHERE id=$1 AND user_id=$2
 		RETURNING `+returnCols,
 		id, userID, in.X, in.Y, in.Width, in.Height, in.ZIndex, in.Color, in.Text, in.Title, in.IsSecret,
-		in.ContainerID, in.ClearContainerID,
+		in.ContainerID, in.ClearContainerID, in.IsFavorite,
 	)
 	if err := scanCard(row, c); err != nil {
 		return nil, err

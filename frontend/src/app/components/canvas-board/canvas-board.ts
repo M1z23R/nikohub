@@ -32,10 +32,12 @@ export class CanvasBoardComponent {
   readonly colors = COLORS;
   readonly list = signal<ICard[]>([]);
   readonly menu = signal<Menu>(null);
-  readonly menuStep = signal<'type' | 'totp-form' | 'container-color'>('type');
+  readonly menuStep = signal<'type' | 'totp-form' | 'container-color' | 'password-form'>('type');
   readonly highlightedContainerId = signal<string | null>(null);
   totpFormName = '';
   totpFormSecret = '';
+  passwordFormName = '';
+  passwordFormValue = '';
 
   @ViewChild('board', { static: true }) board!: ElementRef<HTMLDivElement>;
   @ViewChild('fi') fi?: ElementRef<HTMLInputElement>;
@@ -84,6 +86,14 @@ export class CanvasBoardComponent {
   readonly containers = computed(() =>
     this.list().filter((c) => c.card_type === 'container'),
   );
+
+  readonly favorites = computed(() =>
+    this.list().filter((c) => c.is_favorite && c.card_type !== 'container'),
+  );
+
+  readonly revealToken = signal<{ id: string; n: number } | null>(null);
+  readonly copiedFavoriteId = signal<string | null>(null);
+  private copiedFavTimeout: ReturnType<typeof setTimeout> | null = null;
 
   readonly hasTotps = computed(() => this.list().some((c) => c.card_type === 'totp'));
   readonly totpRemaining = signal(30);
@@ -155,6 +165,7 @@ export class CanvasBoardComponent {
   ngOnDestroy() {
     this.resizeObs?.disconnect();
     if (this.totpTimer) clearInterval(this.totpTimer);
+    if (this.copiedFavTimeout) clearTimeout(this.copiedFavTimeout);
   }
 
   private async fetchAllTotp() {
@@ -293,6 +304,8 @@ export class CanvasBoardComponent {
     this.menuStep.set('type');
     this.totpFormName = '';
     this.totpFormSecret = '';
+    this.passwordFormName = '';
+    this.passwordFormValue = '';
     this.menu.set({
       kind: 'empty',
       x: ev.clientX,
@@ -377,6 +390,21 @@ export class CanvasBoardComponent {
       this.menu.set({ kind: 'card', x: m.x, y: m.y, card: created });
       this.triggerUpload();
     });
+  }
+
+  async createPasswordAt() {
+    const m = this.menu();
+    if (!m || m.kind !== 'empty') return;
+    if (!this.passwordFormName.trim() || !this.passwordFormValue) return;
+    const created = await this.cards.create({
+      x: Math.round(m.canvasX),
+      y: Math.round(m.canvasY),
+      card_type: 'password',
+      title: this.passwordFormName.trim(),
+      text: this.passwordFormValue,
+    });
+    this.list.update((xs) => [...xs, created]);
+    this.closeMenu();
   }
 
   async createTotpAt() {
@@ -565,6 +593,47 @@ export class CanvasBoardComponent {
         return c;
       }),
     );
+  }
+
+  async onFavoriteClick(card: ICard) {
+    if (card.card_type === 'totp') {
+      const code = this.totpCodes()[card.id];
+      if (code) await this.copyToClipboard(code, card.id);
+      return;
+    }
+    if (card.card_type === 'password') {
+      if (card.text) await this.copyToClipboard(card.text, card.id);
+      return;
+    }
+    if (card.card_type === 'note' && !card.is_secret) {
+      if (card.text) await this.copyToClipboard(card.text, card.id);
+      return;
+    }
+    this.navigateToCard(card);
+    if (card.is_secret) {
+      const prev = this.revealToken();
+      this.revealToken.set({ id: card.id, n: (prev?.n ?? 0) + 1 });
+    }
+  }
+
+  favoriteLabel(card: ICard): string {
+    if (card.card_type === 'totp') return card.totp_name || 'TOTP';
+    if (card.card_type === 'password') return card.title || 'Password';
+    if (card.is_secret) return card.title || 'Secret';
+    if (card.card_type === 'image') return card.title || 'Image';
+    const text = (card.text || '').trim();
+    return text ? text.slice(0, 40) : 'Note';
+  }
+
+  favoriteDotColor(card: ICard): string {
+    return getCardTypeColor(card);
+  }
+
+  private async copyToClipboard(text: string, favoriteId: string) {
+    await navigator.clipboard.writeText(text);
+    this.copiedFavoriteId.set(favoriteId);
+    if (this.copiedFavTimeout) clearTimeout(this.copiedFavTimeout);
+    this.copiedFavTimeout = setTimeout(() => this.copiedFavoriteId.set(null), 1500);
   }
 
   navigateToCard(card: ICard) {

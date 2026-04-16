@@ -12,6 +12,15 @@
   (contextmenu)="onContextMenu($event)"
 >
   <div class="drag" (pointerdown)="onHeaderPointerDown($event)">
+    @if (card.card_type !== 'container') {
+      <button class="star-btn" [class.active]="card.is_favorite"
+        (pointerdown)="$event.stopPropagation()" (click)="toggleFavorite()">
+        <svg viewBox="0 0 24 24" [attr.fill]="card.is_favorite ? 'currentColor' : 'none'"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+      </button>
+    }
     @if (isHidden) {
       <button class="eye-btn" (pointerdown)="$event.stopPropagation()" (click)="toggleReveal()">
         @if (revealed()) {
@@ -45,6 +54,30 @@
         <div class="totp-copied">Copied!</div>
       }
     </div>
+  } @else if (card.card_type === 'password') {
+    @if (editingTitle()) {
+      <input #titleInput class="card-title-input" [value]="card.title"
+        (blur)="commitTitleEdit()" (keydown.escape)="commitTitleEdit()" (keydown.enter)="commitTitleEdit()"
+        (pointerdown)="$event.stopPropagation()" />
+    } @else {
+      <div class="card-title" (dblclick)="onTitleDblClick($event)">{{ card.title || 'Password' }}</div>
+    }
+    @if (!revealed()) {
+      <div class="secret-body" (click)="copyText()">
+        <div class="text readonly masked">{{ card.text ? maskedText() : 'Click to set' }}</div>
+        @if (copied()) {
+          <span class="copied-overlay">Copied!</span>
+        }
+      </div>
+    } @else if (editing()) {
+      <textarea #ta class="text" [value]="card.text" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
+    } @else {
+      <div class="text readonly password-text" (click)="copyText()" (dblclick)="onTextDblClick($event)">{{ card.text }}
+        @if (copied()) {
+          <span class="copied-overlay">Copied!</span>
+        }
+      </div>
+    }
   } @else if (card.card_type === 'image') {
     @if (card.has_image) {
       <img class="img" [src]="imageUrl()" alt="" draggable="false" />

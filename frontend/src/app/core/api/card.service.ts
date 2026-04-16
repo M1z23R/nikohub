@@ -12,8 +12,9 @@ export interface ICard {
   text: string;
   has_image: boolean;
   z_index: number;
-  card_type: 'note' | 'image' | 'totp' | 'container';
+  card_type: 'note' | 'image' | 'totp' | 'container' | 'password';
   is_secret: boolean;
+  is_favorite: boolean;
   totp_name?: string;
   container_id: string | null;
   title: string;
@@ -25,10 +26,12 @@ export const CARD_TYPE_COLORS = {
   secret: '#fbcfe8',
   image: '#bfdbfe',
   totp: '#bbf7d0',
+  password: '#ddd6fe',
 } as const;
 
 export function getCardTypeColor(card: ICard): string {
   if (card.card_type === 'container') return card.color;
+  if (card.card_type === 'password') return CARD_TYPE_COLORS.password;
   if (card.is_secret) return CARD_TYPE_COLORS.secret;
   if (card.card_type === 'image') return CARD_TYPE_COLORS.image;
   if (card.card_type === 'totp') return CARD_TYPE_COLORS.totp;
@@ -48,7 +51,7 @@ export interface ITotpBatchResponse {
 }
 
 export type CardPatch = Partial<
-  Pick<ICard, 'x' | 'y' | 'width' | 'height' | 'color' | 'text' | 'title' | 'z_index' | 'is_secret'>
+  Pick<ICard, 'x' | 'y' | 'width' | 'height' | 'color' | 'text' | 'title' | 'z_index' | 'is_secret' | 'is_favorite'>
 > & { container_id?: string };
 
 @Injectable({ providedIn: 'root' })

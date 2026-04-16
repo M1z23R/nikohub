@@ -31,6 +31,9 @@ export class CardComponent implements OnInit, OnDestroy {
   @Input() isSelected = false;
   @Input() scale = 1;
   @Input() totpCode = '';
+  @Input() set revealToken(tok: { id: string; n: number } | null) {
+    if (tok && this.card && tok.id === this.card.id) this.revealed.set(true);
+  }
   @Output() changed = new EventEmitter<ICard>();
   @Output() deleted = new EventEmitter<string>();
   @Output() dropped = new EventEmitter<ICard>();
@@ -65,11 +68,18 @@ export class CardComponent implements OnInit, OnDestroy {
   }
 
   get isHidden(): boolean {
-    return this.card.card_type === 'totp' || this.card.is_secret;
+    return this.card.card_type === 'totp' || this.card.card_type === 'password' || this.card.is_secret;
   }
 
   toggleReveal() {
     this.revealed.set(!this.revealed());
+  }
+
+  async toggleFavorite() {
+    const next = !this.card.is_favorite;
+    this.card = { ...this.card, is_favorite: next };
+    this.changed.emit(this.card);
+    await this.persist({ is_favorite: next } as CardPatch);
   }
 
   async copyText() {
