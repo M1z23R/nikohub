@@ -46,6 +46,9 @@ export class CanvasBoardComponent {
   readonly scale = signal(1);
   readonly boardW = signal(0);
   readonly boardH = signal(0);
+  readonly selected = signal<Set<string>>(new Set());
+  readonly selRect = signal<{ x: number; y: number; w: number; h: number } | null>(null);
+  readonly selecting = signal(false);
 
   private static readonly MIN_SCALE = 0.1;
   private static readonly MAX_SCALE = 3;
@@ -54,6 +57,7 @@ export class CanvasBoardComponent {
   private panOriginX = 0;
   private panOriginY = 0;
   private didPan = false;
+  private didSelect = false;
   private resizeObs?: ResizeObserver;
 
   readonly containers = computed(() =>
@@ -124,33 +128,72 @@ export class CanvasBoardComponent {
   }
 
   onBoardPointerDown(ev: PointerEvent) {
-    if (ev.button !== 0 && ev.button !== 1) return;
-    if (ev.button === 0 && (ev.target as HTMLElement).closest('app-card')) return;
+    if ((ev.target as HTMLElement).closest('app-card')) return;
 
-    ev.preventDefault();
-    this.panning.set(true);
-    this.didPan = false;
-    this.panStartX = ev.clientX;
-    this.panStartY = ev.clientY;
-    this.panOriginX = this.panX();
-    this.panOriginY = this.panY();
+    if (ev.button === 1) {
+      ev.preventDefault();
+      this.panning.set(true);
+      this.didPan = false;
+      this.panStartX = ev.clientX;
+      this.panStartY = ev.clientY;
+      this.panOriginX = this.panX();
+      this.panOriginY = this.panY();
 
-    const onMove = (e: PointerEvent) => {
-      const dx = e.clientX - this.panStartX;
-      const dy = e.clientY - this.panStartY;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.didPan = true;
-      this.panX.set(this.panOriginX + dx);
-      this.panY.set(this.panOriginY + dy);
-    };
+      const onMove = (e: PointerEvent) => {
+        const dx = e.clientX - this.panStartX;
+        const dy = e.clientY - this.panStartY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.didPan = true;
+        this.panX.set(this.panOriginX + dx);
+        this.panY.set(this.panOriginY + dy);
+      };
 
-    const onUp = () => {
-      this.panning.set(false);
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-    };
+      const onUp = () => {
+        this.panning.set(false);
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      };
 
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp, { once: true });
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp, { once: true });
+    } else if (ev.button === 0) {
+      ev.preventDefault();
+      const start = this.screenToCanvas(ev.clientX, ev.clientY);
+      this.selecting.set(true);
+
+      const onMove = (e: PointerEvent) => {
+        const cur = this.screenToCanvas(e.clientX, e.clientY);
+        this.selRect.set({
+          x: Math.min(start.x, cur.x),
+          y: Math.min(start.y, cur.y),
+          w: Math.abs(cur.x - start.x),
+          h: Math.abs(cur.y - start.y),
+        });
+      };
+
+      const onUp = () => {
+        const r = this.selRect();
+        if (r && r.w > 5 && r.h > 5) {
+          const sel = new Set<string>();
+          for (const c of this.list()) {
+            if (
+              c.x >= r.x && c.x + c.width <= r.x + r.w &&
+              c.y >= r.y && c.y + c.height <= r.y + r.h
+            ) {
+              sel.add(c.id);
+            }
+          }
+          this.selected.set(sel);
+          this.didSelect = sel.size > 0;
+        }
+        this.selRect.set(null);
+        this.selecting.set(false);
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      };
+
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp, { once: true });
+    }
   }
 
   onWheel(ev: WheelEvent) {
@@ -203,6 +246,21 @@ export class CanvasBoardComponent {
 
   closeMenu() {
     this.menu.set(null);
+  }
+
+  onBoardClick(ev: MouseEvent) {
+    this.closeMenu();
+    if (this.didSelect) {
+      this.didSelect = false;
+    } else if (!(ev.target as HTMLElement).closest('app-card')) {
+      this.selected.set(new Set());
+    }
+  }
+
+  onCardDragStart(cardId: string) {
+    if (!this.selected().has(cardId)) {
+      this.selected.set(new Set());
+    }
   }
 
   async createSecretNoteAt(color: string) {
@@ -324,21 +382,6 @@ export class CanvasBoardComponent {
   replaceLocally(card: ICard) {
     const old = this.list().find((c) => c.id === card.id);
 
-    if (old && card.card_type === 'container') {
-      const dx = card.x - old.x;
-      const dy = card.y - old.y;
-      if (dx !== 0 || dy !== 0) {
-        this.list.update((xs) =>
-          xs.map((c) => {
-            if (c.id === card.id) return card;
-            if (c.container_id === card.id) return { ...c, x: c.x + dx, y: c.y + dy };
-            return c;
-          }),
-        );
-        return;
-      }
-    }
-
     if (card.card_type !== 'container') {
       const centerX = card.x + card.width / 2;
       const centerY = card.y + card.height / 2;
@@ -356,7 +399,26 @@ export class CanvasBoardComponent {
       this.highlightedContainerId.set(hovered);
     }
 
-    this.list.update((xs) => xs.map((c) => (c.id === card.id ? card : c)));
+    const dx = old ? card.x - old.x : 0;
+    const dy = old ? card.y - old.y : 0;
+    const hasDelta = dx !== 0 || dy !== 0;
+    const sel = this.selected();
+    const isGroupMove = hasDelta && sel.has(card.id) && sel.size > 1;
+    const isContainerMove = hasDelta && card.card_type === 'container';
+
+    if (!isGroupMove && !isContainerMove) {
+      this.list.update((xs) => xs.map((c) => (c.id === card.id ? card : c)));
+      return;
+    }
+
+    this.list.update((xs) =>
+      xs.map((c) => {
+        if (c.id === card.id) return card;
+        if (isGroupMove && sel.has(c.id)) return { ...c, x: c.x + dx, y: c.y + dy };
+        if (isContainerMove && c.container_id === card.id) return { ...c, x: c.x + dx, y: c.y + dy };
+        return c;
+      }),
+    );
   }
 
   navigateToCard(card: ICard) {
@@ -376,6 +438,58 @@ export class CanvasBoardComponent {
 
   async onCardDropped(card: ICard) {
     this.highlightedContainerId.set(null);
+    const sel = this.selected();
+
+    if (sel.has(card.id) && sel.size > 1) {
+      const allCards = this.list();
+      const staticContainers = allCards.filter((c) => c.card_type === 'container' && !sel.has(c.id));
+      const selContainerIds = new Set(
+        allCards.filter((c) => sel.has(c.id) && c.card_type === 'container').map((c) => c.id),
+      );
+
+      const findContainer = (c: ICard): string | null => {
+        const cx = c.x + c.width / 2;
+        const cy = c.y + c.height / 2;
+        for (const cont of staticContainers) {
+          if (cx >= cont.x && cx <= cont.x + cont.width &&
+              cy >= cont.y && cy <= cont.y + cont.height) {
+            return cont.id;
+          }
+        }
+        return null;
+      };
+
+      const patches: Promise<unknown>[] = [];
+
+      for (const sc of allCards) {
+        if (sc.id === card.id) continue;
+        if (sel.has(sc.id)) {
+          const body: Record<string, unknown> = { x: sc.x, y: sc.y };
+          if (sc.card_type !== 'container') {
+            const targetId = findContainer(sc);
+            if (targetId !== (sc.container_id || null)) {
+              body['container_id'] = targetId || '';
+            }
+          }
+          patches.push(this.cards.patch(sc.id, body as any));
+        } else if (sc.container_id && selContainerIds.has(sc.container_id)) {
+          patches.push(this.cards.patch(sc.id, { x: sc.x, y: sc.y }));
+        }
+      }
+
+      if (card.card_type !== 'container') {
+        const targetId = findContainer(card);
+        if (targetId !== (card.container_id || null)) {
+          patches.push(this.cards.patch(card.id, { container_id: targetId || '' }));
+        }
+      }
+
+      if (patches.length > 0) {
+        await Promise.all(patches);
+      }
+      this.selected.set(new Set());
+      return;
+    }
 
     if (card.card_type === 'container') {
       const children = this.list().filter((c) => c.container_id === card.id);

@@ -43,7 +43,12 @@ export class CardService {
   }
 
   patch(id: string, body: CardPatch): Promise<ICard> {
-    return firstValueFrom(this.http.patch<ICard>(`${this.base}/${id}`, body));
+    const rounded = { ...body };
+    if (rounded.x != null) rounded.x = Math.round(rounded.x);
+    if (rounded.y != null) rounded.y = Math.round(rounded.y);
+    if (rounded.width != null) rounded.width = Math.round(rounded.width);
+    if (rounded.height != null) rounded.height = Math.round(rounded.height);
+    return firstValueFrom(this.http.patch<ICard>(`${this.base}/${id}`, rounded));
   }
 
   delete(id: string): Promise<void> {

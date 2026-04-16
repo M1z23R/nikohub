@@ -54,6 +54,9 @@
   border: none; outline: none; background: transparent; font-family: inherit; box-sizing: border-box;
   pointer-events: auto; }
 
+/* Selection highlight */
+.card.selected { outline: 2px solid rgba(99, 102, 241, .6); outline-offset: 2px; }
+
 /* Container highlight on card hover */
 .card.highlighted { box-shadow: 0 0 0 3px rgba(99, 102, 241, .5) !important;
   border-color: rgba(99, 102, 241, .5) !important; }

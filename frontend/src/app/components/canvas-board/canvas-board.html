@@ -1,9 +1,10 @@
 <div #board class="board"
   [class.panning]="panning()"
+  [class.selecting]="selecting()"
   (contextmenu)="onBackgroundContextMenu($event)"
   (pointerdown)="onBoardPointerDown($event)"
   (wheel)="onWheel($event)"
-  (click)="closeMenu()">
+  (click)="onBoardClick($event)">
   <div class="sheet" [style.transform]="'translate(' + panX() + 'px,' + panY() + 'px) scale(' + scale() + ')'"
     style="transform-origin: 0 0">
     @for (c of list(); track c.id) {
@@ -11,11 +12,17 @@
         [card]="c"
         [scale]="scale()"
         [highlighted]="highlightedContainerId() === c.id"
+        [isSelected]="selected().has(c.id)"
         (changed)="replaceLocally($event)"
         (dropped)="onCardDropped($event)"
+        (moveStarted)="onCardDragStart($event)"
         (contextRequested)="onCardContextRequested($event)"
         (click)="bringToFront(c)"
       />
+    }
+    @if (selRect(); as r) {
+      <div class="sel-rect" [style.left.px]="r.x" [style.top.px]="r.y"
+        [style.width.px]="r.w" [style.height.px]="r.h"></div>
     }
   </div>
   @for (ind of indicators(); track $index) {

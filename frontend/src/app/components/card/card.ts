@@ -27,10 +27,12 @@ export class CardComponent implements OnInit, OnDestroy {
 
   @Input({ required: true }) card!: ICard;
   @Input() highlighted = false;
+  @Input() isSelected = false;
   @Input() scale = 1;
   @Output() changed = new EventEmitter<ICard>();
   @Output() deleted = new EventEmitter<string>();
   @Output() dropped = new EventEmitter<ICard>();
+  @Output() moveStarted = new EventEmitter<string>();
   @Output() contextRequested = new EventEmitter<{ card: ICard; x: number; y: number }>();
 
   readonly editing = signal(false);
@@ -126,6 +128,7 @@ export class CardComponent implements OnInit, OnDestroy {
 
   onHeaderPointerDown(ev: PointerEvent) {
     if (this.editing()) return;
+    this.moveStarted.emit(this.card.id);
     this.mode = 'move';
     this.startDrag(ev);
   }

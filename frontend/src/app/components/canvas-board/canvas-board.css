@@ -11,6 +11,9 @@
 .swatch { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--ui-border); cursor: pointer; padding: 0; }
 .swatch.picker { background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
   font-size: 0; line-height: 22px; color: transparent; }
+.board.selecting { cursor: crosshair; user-select: none; }
+.sel-rect { position: absolute; border: 1px solid rgba(99, 102, 241, .6);
+  background: rgba(99, 102, 241, .08); pointer-events: none; z-index: 9999; border-radius: 2px; }
 .indicator { position: absolute; width: 18px; height: 18px; border-radius: 50%;
   border: 2px solid rgba(0,0,0,.3); cursor: pointer; z-index: 5;
   transform: translate(-50%, -50%); box-shadow: 0 0 4px rgba(0,0,0,.2);
