@@ -1,0 +1,25 @@
+[Unit]
+Description=Nikohub Idea Hub
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=nikohub
+Group=nikohub
+WorkingDirectory=/opt/nikohub
+ExecStart=/opt/nikohub/nikohub
+EnvironmentFile=/opt/nikohub/.env
+
+Restart=always
+RestartSec=3
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
