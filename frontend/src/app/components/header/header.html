@@ -1,0 +1,15 @@
+<header class="bar">
+  <div class="brand">nikohub</div>
+  <div class="right">
+    <ui-dropdown position="bottom-end">
+      <button uiDropdownTrigger class="avatar">
+        @if (user()?.avatar_url) {
+          <img [src]="user()!.avatar_url" alt="" />
+        } @else {
+          <span>{{ initial() }}</span>
+        }
+      </button>
+      <ui-dropdown-item (clicked)="logout()">Logout</ui-dropdown-item>
+    </ui-dropdown>
+  </div>
+</header>
