@@ -9,3 +9,6 @@
 
 # OS
 .DS_Store
+
+vault-export.json
+import-vault.sh

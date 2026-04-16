@@ -1,21 +1,88 @@
 <div
   class="card"
+  [class.container]="card.card_type === 'container'"
+  [class.highlighted]="highlighted"
   [style.left.px]="card.x"
   [style.top.px]="card.y"
   [style.width.px]="card.width"
   [style.height.px]="card.height"
-  [style.background]="card.color"
+  [style.background]="cardBackground"
   [style.zIndex]="card.z_index"
   (contextmenu)="onContextMenu($event)"
 >
-  <div class="drag" (pointerdown)="onHeaderPointerDown($event)"></div>
-  @if (card.has_image) {
-    <img class="img" [src]="imageUrl()" alt="" draggable="false" />
-  }
-  @if (editing()) {
-    <textarea #ta class="text" [value]="card.text" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
+  <div class="drag" (pointerdown)="onHeaderPointerDown($event)">
+    @if (isHidden) {
+      <button class="eye-btn" (pointerdown)="$event.stopPropagation()" (click)="toggleReveal()">
+        @if (revealed()) {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        } @else {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        }
+      </button>
+    }
+  </div>
+
+  @if (card.card_type === 'totp') {
+    <div class="totp-body" (click)="copyText()">
+      <div class="totp-name">{{ card.totp_name }}</div>
+      <div class="totp-row">
+        <div class="totp-progress-wrap">
+          <ui-circular-progress [value]="totpProgressPct()" variant="primary" size="sm" [strokeWidth]="3" />
+          <span class="totp-timer">{{ totpRemaining() }}</span>
+        </div>
+        <div class="totp-code">
+          @if (revealed()) {
+            {{ formattedTotp() }}
+          } @else {
+            {{ maskedTotp() }}
+          }
+        </div>
+      </div>
+      @if (copied()) {
+        <div class="totp-copied">Copied!</div>
+      }
+    </div>
+  } @else if (card.card_type === 'image') {
+    @if (card.has_image) {
+      <img class="img" [src]="imageUrl()" alt="" draggable="false" />
+    }
+  } @else if (card.card_type === 'container') {
+    @if (editing()) {
+      <input #ta class="container-label-input" [value]="card.text"
+        (blur)="commitEdit()" (keydown.escape)="commitEdit()" (keydown.enter)="commitEdit()"
+        (pointerdown)="$event.stopPropagation()" />
+    } @else {
+      <div class="container-label" (dblclick)="onTextDblClick($event)">{{ card.text || 'Container' }}</div>
+    }
   } @else {
-    <div class="text readonly" (dblclick)="onTextDblClick($event)">{{ card.text }}</div>
+    @if (card.is_secret) {
+      @if (editingTitle()) {
+        <input #titleInput class="card-title-input" [value]="card.title"
+          (blur)="commitTitleEdit()" (keydown.escape)="commitTitleEdit()" (keydown.enter)="commitTitleEdit()"
+          (pointerdown)="$event.stopPropagation()" />
+      } @else {
+        <div class="card-title" (dblclick)="onTitleDblClick($event)">{{ card.title || 'Untitled' }}</div>
+      }
+    }
+    @if (card.is_secret && !revealed()) {
+      <div class="secret-body" (click)="copyText()">
+        <div class="text readonly masked">{{ maskedText() }}</div>
+        @if (copied()) {
+          <span class="copied-overlay">Copied!</span>
+        }
+      </div>
+    } @else if (editing()) {
+      <textarea #ta class="text" [value]="card.text" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
+    } @else {
+      <div class="text readonly" (dblclick)="onTextDblClick($event)">{{ card.text }}</div>
+    }
   }
+
   <div class="resize" (pointerdown)="onResizePointerDown($event)"></div>
 </div>

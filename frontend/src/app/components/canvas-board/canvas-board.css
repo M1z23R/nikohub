@@ -5,13 +5,13 @@
 .menu { position: fixed; background: var(--ui-bg); border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md); box-shadow: var(--ui-shadow-lg); padding: .5rem; min-width: 180px;
   z-index: 100; font-size: .9rem; }
+.menu ui-button { display: block; width: 100%; }
 .label { font-size: .75rem; color: var(--ui-text-muted); padding: .25rem .5rem; }
 .swatches { display:flex; gap: .25rem; padding: .25rem .5rem .5rem; }
 .swatch { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--ui-border); cursor: pointer; padding: 0; }
-.item { display:block; width: 100%; text-align:left; background: transparent; border: none; padding: .5rem .75rem;
-  cursor: pointer; font: inherit; color: inherit; border-radius: var(--ui-radius-sm); }
-.item:hover { background: var(--ui-bg-hover); }
-.item.danger { color: var(--ui-danger); }
+.swatch.picker { background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+  font-size: 0; line-height: 22px; color: transparent; }
 .indicator { position: absolute; width: 10px; height: 10px; border-radius: 50%;
   border: 2px solid rgba(0,0,0,.3); pointer-events: none; z-index: 5;
   transform: translate(-50%, -50%); box-shadow: 0 0 4px rgba(0,0,0,.2); }
+.totp-form { display: flex; flex-direction: column; gap: .35rem; padding: .25rem .5rem .5rem; }

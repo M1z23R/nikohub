@@ -1,0 +1,3 @@
+ALTER TABLE cards ADD COLUMN card_type TEXT NOT NULL DEFAULT 'note';
+ALTER TABLE cards ADD COLUMN totp_secret TEXT;
+ALTER TABLE cards ADD COLUMN totp_name TEXT;

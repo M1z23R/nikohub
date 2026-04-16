@@ -9,7 +9,9 @@
     @for (c of list(); track c.id) {
       <app-card
         [card]="c"
+        [highlighted]="highlightedContainerId() === c.id"
         (changed)="replaceLocally($event)"
+        (dropped)="onCardDropped($event)"
         (contextRequested)="onCardContextRequested($event)"
         (click)="bringToFront(c)"
       />
@@ -24,28 +26,74 @@
   }
 </div>
 
+<input #cp type="color" (change)="onCustomColor($event)" style="display:none" />
+
 @if (menu(); as m) {
   <div class="menu" [style.left.px]="m.x" [style.top.px]="m.y" (click)="$event.stopPropagation()">
     @if (m.kind === 'empty') {
-      <div class="label">New note</div>
-      <div class="swatches">
-        @for (color of colors; track color) {
-          <button class="swatch" [style.background]="color" (click)="createAt(color)"></button>
-        }
-      </div>
+      @if (menuStep() === 'type') {
+        <div class="label">New card</div>
+        <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('note-color')">Note</ui-button>
+        <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('secret-color')">Secret note</ui-button>
+        <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('image-color')">Image</ui-button>
+        <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('totp-form')">TOTP</ui-button>
+        <ui-button variant="ghost" size="sm" (clicked)="menuStep.set('container-color')">Container</ui-button>
+      } @else if (menuStep() === 'note-color') {
+        <div class="label">Pick color</div>
+        <div class="swatches">
+          @for (color of colors; track color) {
+            <button class="swatch" [style.background]="color" (click)="createNoteAt(color)"></button>
+          }
+          <button class="swatch picker" (click)="openColorPicker(createNoteAt.bind(this))">+</button>
+        </div>
+      } @else if (menuStep() === 'secret-color') {
+        <div class="label">Pick color</div>
+        <div class="swatches">
+          @for (color of colors; track color) {
+            <button class="swatch" [style.background]="color" (click)="createNoteAt(color, true)"></button>
+          }
+          <button class="swatch picker" (click)="openColorPicker(createSecretNoteAt.bind(this))">+</button>
+        </div>
+      } @else if (menuStep() === 'image-color') {
+        <div class="label">Pick color</div>
+        <div class="swatches">
+          @for (color of colors; track color) {
+            <button class="swatch" [style.background]="color" (click)="createImageAt(color)"></button>
+          }
+          <button class="swatch picker" (click)="openColorPicker(createImageAt.bind(this))">+</button>
+        </div>
+      } @else if (menuStep() === 'container-color') {
+        <div class="label">Pick color</div>
+        <div class="swatches">
+          @for (color of colors; track color) {
+            <button class="swatch" [style.background]="color" (click)="createContainerAt(color)"></button>
+          }
+          <button class="swatch picker" (click)="openColorPicker(createContainerAt.bind(this))">+</button>
+        </div>
+      } @else if (menuStep() === 'totp-form') {
+        <div class="label">New TOTP</div>
+        <div class="totp-form">
+          <ui-input placeholder="Name" [(value)]="totpFormName" />
+          <ui-input placeholder="Secret" [(value)]="totpFormSecret" />
+          <ui-button size="sm" [disabled]="!totpFormName.trim() || !totpFormSecret.trim()" (clicked)="createTotpAt()">Create</ui-button>
+        </div>
+      }
     } @else {
       <div class="label">Color</div>
       <div class="swatches">
         @for (color of colors; track color) {
           <button class="swatch" [style.background]="color" (click)="changeCardColor(color)"></button>
         }
+        <button class="swatch picker" (click)="openColorPicker(changeCardColor.bind(this))">+</button>
       </div>
-      <button class="item" (click)="triggerUpload()">Upload image</button>
-      <input #fi type="file" accept="image/*" (change)="uploadImage($event)" style="display:none" />
-      @if (m.card.has_image) {
-        <button class="item" (click)="removeImage()">Remove image</button>
+      @if (m.card.card_type === 'image') {
+        <ui-button variant="ghost" size="sm" (clicked)="triggerUpload()">Upload image</ui-button>
+        <input #fi type="file" accept="image/*" (change)="uploadImage($event)" style="display:none" />
+        @if (m.card.has_image) {
+          <ui-button variant="ghost" size="sm" (clicked)="removeImage()">Remove image</ui-button>
+        }
       }
-      <button class="item danger" (click)="deleteCard()">Delete</button>
+      <ui-button variant="ghost" color="danger" size="sm" (clicked)="deleteCard()">Delete</ui-button>
     }
   </div>
 }

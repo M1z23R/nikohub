@@ -3,6 +3,8 @@ package cards
 import (
 	"database/sql"
 	"io"
+	"log"
+	"time"
 
 	nikologs "github.com/M1z23r/nikologs-go"
 	"github.com/google/uuid"
@@ -29,10 +31,17 @@ func (h *Handlers) List(c *drift.Context) {
 }
 
 type createReq struct {
-	X     int    `json:"x"`
-	Y     int    `json:"y"`
-	Color string `json:"color"`
-	Text  string `json:"text"`
+	X          int    `json:"x"`
+	Y          int    `json:"y"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	Color      string `json:"color"`
+	Text       string `json:"text"`
+	Title      string `json:"title"`
+	CardType   string `json:"card_type"`
+	IsSecret   bool   `json:"is_secret"`
+	TotpSecret string `json:"totp_secret,omitempty"`
+	TotpName   string `json:"totp_name,omitempty"`
 }
 
 func (h *Handlers) Create(c *drift.Context) {
@@ -42,8 +51,17 @@ func (h *Handlers) Create(c *drift.Context) {
 		httpx.Err(c, 400, "bad json")
 		return
 	}
-	card, err := h.Repo.Create(uid, CreateInput{X: in.X, Y: in.Y, Color: in.Color, Text: in.Text})
+	if in.CardType == "totp" && in.TotpSecret == "" {
+		httpx.Err(c, 400, "totp_secret required for totp card")
+		return
+	}
+	card, err := h.Repo.Create(uid, CreateInput{
+		X: in.X, Y: in.Y, Width: in.Width, Height: in.Height,
+		Color: in.Color, Text: in.Text, Title: in.Title,
+		CardType: in.CardType, IsSecret: in.IsSecret, TotpSecret: in.TotpSecret, TotpName: in.TotpName,
+	})
 	if err != nil {
+		log.Printf("CREATE CARD ERROR: %v", err)
 		httpx.Err(c, 500, "create failed")
 		return
 	}
@@ -51,13 +69,16 @@ func (h *Handlers) Create(c *drift.Context) {
 }
 
 type patchReq struct {
-	X      *int    `json:"x,omitempty"`
-	Y      *int    `json:"y,omitempty"`
-	Width  *int    `json:"width,omitempty"`
-	Height *int    `json:"height,omitempty"`
-	ZIndex *int    `json:"z_index,omitempty"`
-	Color  *string `json:"color,omitempty"`
-	Text   *string `json:"text,omitempty"`
+	X           *int    `json:"x,omitempty"`
+	Y           *int    `json:"y,omitempty"`
+	Width       *int    `json:"width,omitempty"`
+	Height      *int    `json:"height,omitempty"`
+	ZIndex      *int    `json:"z_index,omitempty"`
+	Color       *string `json:"color,omitempty"`
+	Text        *string `json:"text,omitempty"`
+	Title       *string `json:"title,omitempty"`
+	IsSecret    *bool   `json:"is_secret,omitempty"`
+	ContainerID *string `json:"container_id,omitempty"`
 }
 
 func (h *Handlers) Patch(c *drift.Context) {
@@ -72,15 +93,33 @@ func (h *Handlers) Patch(c *drift.Context) {
 		httpx.Err(c, 400, "bad json")
 		return
 	}
+
+	var containerID *uuid.UUID
+	clearContainerID := false
+	if in.ContainerID != nil {
+		if *in.ContainerID == "" {
+			clearContainerID = true
+		} else {
+			parsed, err := uuid.Parse(*in.ContainerID)
+			if err != nil {
+				httpx.Err(c, 400, "bad container_id")
+				return
+			}
+			containerID = &parsed
+		}
+	}
+
 	card, err := h.Repo.Update(uid, id, UpdateInput{
 		X: in.X, Y: in.Y, Width: in.Width, Height: in.Height, ZIndex: in.ZIndex,
-		Color: in.Color, Text: in.Text,
+		Color: in.Color, Text: in.Text, Title: in.Title, IsSecret: in.IsSecret,
+		ContainerID: containerID, ClearContainerID: clearContainerID,
 	})
 	if err == sql.ErrNoRows {
 		httpx.Err(c, 404, "not found")
 		return
 	}
 	if err != nil {
+		log.Printf("UPDATE CARD ERROR: %v", err)
 		httpx.Err(c, 500, "update failed")
 		return
 	}
@@ -164,6 +203,32 @@ func (h *Handlers) DeleteImage(c *drift.Context) {
 		return
 	}
 	c.Status(204)
+}
+
+func (h *Handlers) GetTOTP(c *drift.Context) {
+	uid := auth.UserID(c)
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		httpx.Err(c, 400, "bad id")
+		return
+	}
+	secret, err := h.Repo.GetSecret(uid, id)
+	if err == sql.ErrNoRows {
+		httpx.Err(c, 404, "not found")
+		return
+	}
+	if err != nil {
+		httpx.Err(c, 500, "read failed")
+		return
+	}
+	now := time.Now()
+	code, err := GenerateTOTP(secret, now)
+	if err != nil {
+		httpx.Err(c, 500, "totp generation failed")
+		return
+	}
+	remaining := 30 - int(now.Unix()%30)
+	c.JSON(200, TotpCode{Code: code, Remaining: remaining, Period: 30})
 }
 
 func (h *Handlers) GetImage(c *drift.Context) {

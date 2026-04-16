@@ -1,0 +1,1 @@
+ALTER TABLE cards ADD COLUMN container_id UUID REFERENCES cards(id) ON DELETE SET NULL;

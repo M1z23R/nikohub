@@ -78,6 +78,7 @@ func main() {
 	api.Delete("/cards/:id", auth.RequireAccess(secret), cardH.Delete)
 	api.Post("/cards/:id/image", auth.RequireAccess(secret), cardH.UploadImage)
 	api.Delete("/cards/:id/image", auth.RequireAccess(secret), cardH.DeleteImage)
+	api.Get("/cards/:id/totp", auth.RequireAccess(secret), cardH.GetTOTP)
 	api.Get("/cards/:id/image", auth.RequireAccessOrCookie(secret, pg), cardH.GetImage)
 
 	nlog.Info("server starting", nikologs.Fields{"port": cfg.Port})

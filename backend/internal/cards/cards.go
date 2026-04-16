@@ -1,23 +1,78 @@
 package cards
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
 	"database/sql"
+	"encoding/base32"
+	"encoding/binary"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
 
+type TotpCode struct {
+	Code      string `json:"code"`
+	Remaining int    `json:"remaining"`
+	Period    int    `json:"period"`
+}
+
+func GenerateTOTP(secret string, t time.Time) (string, error) {
+	secret = strings.TrimSpace(strings.ToUpper(secret))
+	secret = strings.ReplaceAll(secret, " ", "")
+	for len(secret)%8 != 0 {
+		secret += "="
+	}
+	key, err := base32.StdEncoding.DecodeString(secret)
+	if err != nil {
+		return "", fmt.Errorf("invalid secret: %w", err)
+	}
+
+	counter := uint64(t.Unix()) / 30
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, counter)
+
+	mac := hmac.New(sha1.New, key)
+	mac.Write(buf)
+	h := mac.Sum(nil)
+
+	offset := h[len(h)-1] & 0x0f
+	code := binary.BigEndian.Uint32(h[offset:offset+4]) & 0x7fffffff
+	return fmt.Sprintf("%06d", code%1000000), nil
+}
+
+func (r *Repo) GetSecret(userID, id uuid.UUID) (string, error) {
+	var secret sql.NullString
+	err := r.db.QueryRow(
+		`SELECT totp_secret FROM cards WHERE id=$1 AND user_id=$2 AND card_type='totp'`, id, userID,
+	).Scan(&secret)
+	if err != nil {
+		return "", err
+	}
+	if !secret.Valid {
+		return "", sql.ErrNoRows
+	}
+	return secret.String, nil
+}
+
 type Card struct {
-	ID        uuid.UUID `json:"id"`
-	X         int       `json:"x"`
-	Y         int       `json:"y"`
-	Width     int       `json:"width"`
-	Height    int       `json:"height"`
-	Color     string    `json:"color"`
-	Text      string    `json:"text"`
-	HasImage  bool      `json:"has_image"`
-	ZIndex    int       `json:"z_index"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          uuid.UUID  `json:"id"`
+	X           int        `json:"x"`
+	Y           int        `json:"y"`
+	Width       int        `json:"width"`
+	Height      int        `json:"height"`
+	Color       string     `json:"color"`
+	Text        string     `json:"text"`
+	HasImage    bool       `json:"has_image"`
+	ZIndex      int        `json:"z_index"`
+	CardType    string     `json:"card_type"`
+	IsSecret    bool       `json:"is_secret"`
+	TotpName    string     `json:"totp_name,omitempty"`
+	ContainerID *uuid.UUID `json:"container_id"`
+	Title       string     `json:"title"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 type Repo struct{ db *sql.DB }
@@ -26,7 +81,7 @@ func NewRepo(db *sql.DB) *Repo { return &Repo{db: db} }
 
 func (r *Repo) List(userID uuid.UUID) ([]Card, error) {
 	rows, err := r.db.Query(`
-		SELECT id,x,y,width,height,color,text,(image_data IS NOT NULL),z_index,updated_at
+		SELECT `+returnCols+`
 		FROM cards WHERE user_id=$1 ORDER BY z_index ASC, created_at ASC`, userID)
 	if err != nil {
 		return nil, err
@@ -35,7 +90,7 @@ func (r *Repo) List(userID uuid.UUID) ([]Card, error) {
 	out := []Card{}
 	for rows.Next() {
 		var c Card
-		if err := rows.Scan(&c.ID, &c.X, &c.Y, &c.Width, &c.Height, &c.Color, &c.Text, &c.HasImage, &c.ZIndex, &c.UpdatedAt); err != nil {
+		if err := scanCard(rows, &c); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -44,8 +99,23 @@ func (r *Repo) List(userID uuid.UUID) ([]Card, error) {
 }
 
 type CreateInput struct {
-	X, Y        int
-	Color, Text string
+	X, Y, Width, Height int
+	Color, Text, Title  string
+	CardType            string
+	IsSecret            bool
+	TotpSecret          string
+	TotpName            string
+}
+
+const returnCols = `id,x,y,width,height,color,text,(image_data IS NOT NULL),z_index,card_type,is_secret,COALESCE(totp_name,''),container_id,title,updated_at`
+
+func scanCard(row interface{ Scan(...any) error }, c *Card) error {
+	var containerID uuid.NullUUID
+	err := row.Scan(&c.ID, &c.X, &c.Y, &c.Width, &c.Height, &c.Color, &c.Text, &c.HasImage, &c.ZIndex, &c.CardType, &c.IsSecret, &c.TotpName, &containerID, &c.Title, &c.UpdatedAt)
+	if containerID.Valid {
+		c.ContainerID = &containerID.UUID
+	}
+	return err
 }
 
 func (r *Repo) Create(userID uuid.UUID, in CreateInput) (*Card, error) {
@@ -53,14 +123,31 @@ func (r *Repo) Create(userID uuid.UUID, in CreateInput) (*Card, error) {
 	if color == "" {
 		color = "#fde68a"
 	}
+	cardType := in.CardType
+	if cardType == "" {
+		cardType = "note"
+	}
+	width := in.Width
+	if width <= 0 {
+		width = 220
+	}
+	height := in.Height
+	if height <= 0 {
+		height = 160
+	}
 	c := &Card{}
+	var totpSecret, totpName *string
+	if cardType == "totp" {
+		totpSecret = &in.TotpSecret
+		totpName = &in.TotpName
+	}
 	err := r.db.QueryRow(`
-		INSERT INTO cards(user_id,x,y,color,text)
-		VALUES($1,$2,$3,$4,$5)
-		RETURNING id,x,y,width,height,color,text,(image_data IS NOT NULL),z_index,updated_at`,
-		userID, in.X, in.Y, color, in.Text,
-	).Scan(&c.ID, &c.X, &c.Y, &c.Width, &c.Height, &c.Color, &c.Text, &c.HasImage, &c.ZIndex, &c.UpdatedAt)
-	if err != nil {
+		INSERT INTO cards(user_id,x,y,width,height,color,text,title,card_type,is_secret,totp_secret,totp_name)
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+		RETURNING `+returnCols,
+		userID, in.X, in.Y, width, height, color, in.Text, in.Title, cardType, in.IsSecret, totpSecret, totpName,
+	)
+	if err := scanCard(err, c); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -68,12 +155,15 @@ func (r *Repo) Create(userID uuid.UUID, in CreateInput) (*Card, error) {
 
 type UpdateInput struct {
 	X, Y, Width, Height, ZIndex *int
-	Color, Text                 *string
+	Color, Text, Title          *string
+	IsSecret                    *bool
+	ContainerID                 *uuid.UUID
+	ClearContainerID            bool
 }
 
 func (r *Repo) Update(userID, id uuid.UUID, in UpdateInput) (*Card, error) {
 	c := &Card{}
-	err := r.db.QueryRow(`
+	row := r.db.QueryRow(`
 		UPDATE cards SET
 		  x = COALESCE($3,x),
 		  y = COALESCE($4,y),
@@ -82,12 +172,16 @@ func (r *Repo) Update(userID, id uuid.UUID, in UpdateInput) (*Card, error) {
 		  z_index = COALESCE($7,z_index),
 		  color = COALESCE($8,color),
 		  text = COALESCE($9,text),
+		  title = COALESCE($10,title),
+		  is_secret = COALESCE($11,is_secret),
+		  container_id = CASE WHEN $13 THEN NULL WHEN $12::uuid IS NOT NULL THEN $12::uuid ELSE container_id END,
 		  updated_at = now()
 		WHERE id=$1 AND user_id=$2
-		RETURNING id,x,y,width,height,color,text,(image_data IS NOT NULL),z_index,updated_at`,
-		id, userID, in.X, in.Y, in.Width, in.Height, in.ZIndex, in.Color, in.Text,
-	).Scan(&c.ID, &c.X, &c.Y, &c.Width, &c.Height, &c.Color, &c.Text, &c.HasImage, &c.ZIndex, &c.UpdatedAt)
-	if err != nil {
+		RETURNING `+returnCols,
+		id, userID, in.X, in.Y, in.Width, in.Height, in.ZIndex, in.Color, in.Text, in.Title, in.IsSecret,
+		in.ContainerID, in.ClearContainerID,
+	)
+	if err := scanCard(row, c); err != nil {
 		return nil, err
 	}
 	return c, nil

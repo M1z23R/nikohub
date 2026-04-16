@@ -1,9 +1,59 @@
 .card { position:absolute; border-radius: var(--ui-radius-md); box-shadow: var(--ui-shadow-md);
   display:flex; flex-direction:column; overflow:hidden; }
-.drag { height: 20px; cursor: move; background: rgba(0,0,0,.06); touch-action: none; user-select: none; }
-.img { width:100%; max-height: 50%; object-fit: cover; }
+.drag { height: 20px; cursor: move; background: rgba(0,0,0,.06); touch-action: none; user-select: none;
+  display: flex; align-items: center; justify-content: flex-end; padding: 0 2px; }
+.eye-btn { background: transparent; border: none; cursor: pointer; padding: 1px 3px; display: flex;
+  align-items: center; opacity: .45; transition: opacity .15s; }
+.eye-btn:hover { opacity: .85; }
+.eye-btn svg { width: 14px; height: 14px; }
+.img { width:100%; flex: 1; object-fit: cover; }
 .text { flex:1; padding: .5rem .75rem; font-size: .9rem; color: #1f2937; white-space: pre-wrap;
   outline: none; border: none; background: transparent; resize: none; font-family: inherit; }
 .readonly { overflow:auto; cursor: text; }
+.masked { user-select: none; filter: blur(4px); }
 .resize { position:absolute; right:0; bottom:0; width:14px; height:14px; cursor: se-resize;
   background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,.2) 50%); touch-action: none; }
+
+/* Secret note title */
+.card-title { padding: .3rem .75rem; font-size: .8rem; font-weight: 600; color: #374151;
+  user-select: none; cursor: default; border-bottom: 1px solid rgba(0,0,0,.06);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-title-input { display: block; width: 100%; padding: .3rem .75rem; font-size: .8rem; font-weight: 600;
+  border: none; outline: none; background: transparent; font-family: inherit; box-sizing: border-box;
+  border-bottom: 1px solid rgba(0,0,0,.06); }
+
+/* Secret note — copied overlay outside the blur */
+.secret-body { flex: 1; position: relative; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; }
+.copied-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: .8rem; font-weight: 600; color: #059669; background: rgba(255,255,255,.55); }
+
+/* TOTP */
+.totp-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: .5rem; gap: .25rem; user-select: none; cursor: pointer; position: relative; }
+.totp-body:active { opacity: .7; }
+.totp-name { font-size: .75rem; font-weight: 600; color: #374151; text-transform: uppercase;
+  letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; text-align: center; }
+.totp-row { display: flex; align-items: center; gap: .5rem; }
+.totp-code { font-family: 'Courier New', monospace; font-size: 1.5rem; font-weight: 700; letter-spacing: .2em;
+  color: #111827; padding: .25rem .5rem; }
+.totp-progress-wrap { position: relative; display: flex; align-items: center; justify-content: center;
+  --ui-primary: #6366f1; }
+.totp-timer { position: absolute; font-size: .55rem; font-weight: 700; color: #374151; pointer-events: none; }
+.totp-copied { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center;
+  font-size: .65rem; color: #059669; font-weight: 500; }
+
+/* Container */
+.card.container { border: 2px dashed rgba(0,0,0,.15); box-shadow: none; border-radius: var(--ui-radius-lg);
+  overflow: visible; pointer-events: none; }
+.card.container .drag { background: rgba(0,0,0,.04); border-radius: var(--ui-radius-lg) var(--ui-radius-lg) 0 0;
+  pointer-events: auto; }
+.card.container .resize { pointer-events: auto; }
+.container-label { padding: .3rem .75rem; font-size: .8rem; font-weight: 600; color: rgba(0,0,0,.4);
+  user-select: none; cursor: default; pointer-events: auto; }
+.container-label-input { display: block; width: 100%; padding: .3rem .75rem; font-size: .8rem; font-weight: 600;
+  border: none; outline: none; background: transparent; font-family: inherit; box-sizing: border-box;
+  pointer-events: auto; }
+
+/* Container highlight on card hover */
+.card.highlighted { box-shadow: 0 0 0 3px rgba(99, 102, 241, .5) !important;
+  border-color: rgba(99, 102, 241, .5) !important; }

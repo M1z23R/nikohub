@@ -1,6 +1,7 @@
 import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
+import { ButtonComponent, InputComponent } from '@m1z23r/ngx-ui';
 import { CardComponent } from '../card/card';
-import { Card, CardService } from '../../core/api/card.service';
+import { ICard, CardService } from '../../core/api/card.service';
 
 export interface EdgeIndicator {
   x: number;
@@ -13,24 +14,30 @@ const COLORS = ['#fde68a', '#fbcfe8', '#bfdbfe', '#bbf7d0', '#ddd6fe', '#fed7aa'
 
 type Menu =
   | { kind: 'empty'; x: number; y: number; canvasX: number; canvasY: number }
-  | { kind: 'card'; x: number; y: number; card: Card }
+  | { kind: 'card'; x: number; y: number; card: ICard }
   | null;
 
 @Component({
   selector: 'app-canvas-board',
   standalone: true,
-  imports: [CardComponent],
+  imports: [CardComponent, ButtonComponent, InputComponent],
   templateUrl: './canvas-board.html',
   styleUrl: './canvas-board.css',
 })
 export class CanvasBoardComponent {
   private cards = inject(CardService);
   readonly colors = COLORS;
-  readonly list = signal<Card[]>([]);
+  readonly list = signal<ICard[]>([]);
   readonly menu = signal<Menu>(null);
+  readonly menuStep = signal<'type' | 'note-color' | 'secret-color' | 'image-color' | 'totp-form' | 'container-color'>('type');
+  readonly highlightedContainerId = signal<string | null>(null);
+  totpFormName = '';
+  totpFormSecret = '';
 
   @ViewChild('board', { static: true }) board!: ElementRef<HTMLDivElement>;
   @ViewChild('fi') fi?: ElementRef<HTMLInputElement>;
+  @ViewChild('cp') cp?: ElementRef<HTMLInputElement>;
+  private colorPickerCallback: ((color: string) => void) | null = null;
 
   readonly panning = signal(false);
   readonly panX = signal(0);
@@ -173,6 +180,9 @@ export class CanvasBoardComponent {
   onBackgroundContextMenu(ev: MouseEvent) {
     ev.preventDefault();
     const pos = this.screenToCanvas(ev.clientX, ev.clientY);
+    this.menuStep.set('type');
+    this.totpFormName = '';
+    this.totpFormSecret = '';
     this.menu.set({
       kind: 'empty',
       x: ev.clientX,
@@ -182,7 +192,7 @@ export class CanvasBoardComponent {
     });
   }
 
-  onCardContextRequested(e: { card: Card; x: number; y: number }) {
+  onCardContextRequested(e: { card: ICard; x: number; y: number }) {
     this.menu.set({ kind: 'card', x: e.x, y: e.y, card: e.card });
   }
 
@@ -190,10 +200,58 @@ export class CanvasBoardComponent {
     this.menu.set(null);
   }
 
-  async createAt(color: string) {
+  async createSecretNoteAt(color: string) {
+    return this.createNoteAt(color, true);
+  }
+
+  async createNoteAt(color: string, isSecret = false) {
     const m = this.menu();
     if (!m || m.kind !== 'empty') return;
-    const created = await this.cards.create({ x: Math.round(m.canvasX), y: Math.round(m.canvasY), color });
+    const created = await this.cards.create({
+      x: Math.round(m.canvasX), y: Math.round(m.canvasY), color,
+      ...(isSecret ? { is_secret: true } : {}),
+    });
+    this.list.update((xs) => [...xs, created]);
+    this.closeMenu();
+  }
+
+  async createImageAt(color: string) {
+    const m = this.menu();
+    if (!m || m.kind !== 'empty') return;
+    const created = await this.cards.create({ x: Math.round(m.canvasX), y: Math.round(m.canvasY), color, card_type: 'image' });
+    this.list.update((xs) => [...xs, created]);
+    this.closeMenu();
+    setTimeout(() => {
+      this.menu.set({ kind: 'card', x: m.x, y: m.y, card: created });
+      this.triggerUpload();
+    });
+  }
+
+  async createTotpAt() {
+    const m = this.menu();
+    if (!m || m.kind !== 'empty') return;
+    if (!this.totpFormName.trim() || !this.totpFormSecret.trim()) return;
+    const created = await this.cards.createTotp({
+      x: Math.round(m.canvasX),
+      y: Math.round(m.canvasY),
+      totp_name: this.totpFormName.trim(),
+      totp_secret: this.totpFormSecret.trim(),
+    });
+    this.list.update((xs) => [...xs, created]);
+    this.closeMenu();
+  }
+
+  async createContainerAt(color: string) {
+    const m = this.menu();
+    if (!m || m.kind !== 'empty') return;
+    const created = await this.cards.create({
+      x: Math.round(m.canvasX),
+      y: Math.round(m.canvasY),
+      width: 400,
+      height: 300,
+      color,
+      card_type: 'container',
+    });
     this.list.update((xs) => [...xs, created]);
     this.closeMenu();
   }
@@ -206,7 +264,7 @@ export class CanvasBoardComponent {
     this.closeMenu();
   }
 
-  async bringToFront(card: Card) {
+  async bringToFront(card: ICard) {
     const maxZ = this.list().reduce((m, c) => Math.max(m, c.z_index), 0);
     if (card.z_index === maxZ) return;
     const updated = await this.cards.patch(card.id, { z_index: maxZ + 1 });
@@ -247,7 +305,85 @@ export class CanvasBoardComponent {
     this.closeMenu();
   }
 
-  replaceLocally(card: Card) {
+  openColorPicker(cb: (color: string) => void) {
+    this.colorPickerCallback = cb;
+    this.cp?.nativeElement.click();
+  }
+
+  onCustomColor(ev: Event) {
+    const color = (ev.target as HTMLInputElement).value;
+    this.colorPickerCallback?.(color);
+    this.colorPickerCallback = null;
+  }
+
+  replaceLocally(card: ICard) {
+    const old = this.list().find((c) => c.id === card.id);
+
+    if (old && card.card_type === 'container') {
+      const dx = card.x - old.x;
+      const dy = card.y - old.y;
+      if (dx !== 0 || dy !== 0) {
+        this.list.update((xs) =>
+          xs.map((c) => {
+            if (c.id === card.id) return card;
+            if (c.container_id === card.id) return { ...c, x: c.x + dx, y: c.y + dy };
+            return c;
+          }),
+        );
+        return;
+      }
+    }
+
+    if (card.card_type !== 'container') {
+      const centerX = card.x + card.width / 2;
+      const centerY = card.y + card.height / 2;
+      const containers = this.list().filter((c) => c.card_type === 'container' && c.id !== card.id);
+      let hovered: string | null = null;
+      for (const cont of containers) {
+        if (
+          centerX >= cont.x && centerX <= cont.x + cont.width &&
+          centerY >= cont.y && centerY <= cont.y + cont.height
+        ) {
+          hovered = cont.id;
+          break;
+        }
+      }
+      this.highlightedContainerId.set(hovered);
+    }
+
     this.list.update((xs) => xs.map((c) => (c.id === card.id ? card : c)));
+  }
+
+  async onCardDropped(card: ICard) {
+    this.highlightedContainerId.set(null);
+
+    if (card.card_type === 'container') {
+      const children = this.list().filter((c) => c.container_id === card.id);
+      if (children.length > 0) {
+        await Promise.all(children.map((c) => this.cards.patch(c.id, { x: c.x, y: c.y })));
+      }
+      return;
+    }
+
+    const centerX = card.x + card.width / 2;
+    const centerY = card.y + card.height / 2;
+    const containers = this.list().filter((c) => c.card_type === 'container');
+
+    let targetId: string | null = null;
+    for (const cont of containers) {
+      if (
+        centerX >= cont.x && centerX <= cont.x + cont.width &&
+        centerY >= cont.y && centerY <= cont.y + cont.height
+      ) {
+        targetId = cont.id;
+        break;
+      }
+    }
+
+    const currentId = card.container_id || null;
+    if (targetId !== currentId) {
+      const updated = await this.cards.patch(card.id, { container_id: targetId || '' });
+      this.list.update((xs) => xs.map((c) => (c.id === updated.id ? updated : c)));
+    }
   }
 }
