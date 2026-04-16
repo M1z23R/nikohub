@@ -27,6 +27,7 @@ export class CardComponent implements OnInit, OnDestroy {
 
   @Input({ required: true }) card!: ICard;
   @Input() highlighted = false;
+  @Input() scale = 1;
   @Output() changed = new EventEmitter<ICard>();
   @Output() deleted = new EventEmitter<string>();
   @Output() dropped = new EventEmitter<ICard>();
@@ -149,8 +150,8 @@ export class CardComponent implements OnInit, OnDestroy {
   }
 
   private onMove = (ev: PointerEvent) => {
-    const dx = ev.clientX - this.startX;
-    const dy = ev.clientY - this.startY;
+    const dx = (ev.clientX - this.startX) / this.scale;
+    const dy = (ev.clientY - this.startY) / this.scale;
     if (this.mode === 'move') {
       this.card = { ...this.card, x: this.origX + dx, y: this.origY + dy };
     } else if (this.mode === 'resize') {

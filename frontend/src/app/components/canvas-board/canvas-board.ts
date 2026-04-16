@@ -8,6 +8,7 @@ export interface EdgeIndicator {
   y: number;
   color: string;
   edge: 'top' | 'bottom' | 'left' | 'right' | 'corner';
+  cardId: string;
 }
 
 const COLORS = ['#fde68a', '#fbcfe8', '#bfdbfe', '#bbf7d0', '#ddd6fe', '#fed7aa'];
@@ -55,6 +56,10 @@ export class CanvasBoardComponent {
   private didPan = false;
   private resizeObs?: ResizeObserver;
 
+  readonly containers = computed(() =>
+    this.list().filter((c) => c.card_type === 'container'),
+  );
+
   readonly indicators = computed<EdgeIndicator[]>(() => {
     const px = this.panX();
     const py = this.panY();
@@ -96,7 +101,7 @@ export class CanvasBoardComponent {
         edge = cx < 0 ? 'left' : 'right';
       }
 
-      result.push({ x, y, color: card.color, edge });
+      result.push({ x, y, color: card.color, edge, cardId: card.id });
     }
     return result;
   });
@@ -352,6 +357,21 @@ export class CanvasBoardComponent {
     }
 
     this.list.update((xs) => xs.map((c) => (c.id === card.id ? card : c)));
+  }
+
+  navigateToCard(card: ICard) {
+    const bw = this.boardW();
+    const bh = this.boardH();
+    const cx = card.x + card.width / 2;
+    const cy = card.y + card.height / 2;
+    const s = this.scale();
+    this.panX.set(bw / 2 - cx * s);
+    this.panY.set(bh / 2 - cy * s);
+  }
+
+  navigateToIndicator(ind: EdgeIndicator) {
+    const card = this.list().find((c) => c.id === ind.cardId);
+    if (card) this.navigateToCard(card);
   }
 
   async onCardDropped(card: ICard) {

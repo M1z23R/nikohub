@@ -12,6 +12,19 @@
 .swatch.picker { background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
   font-size: 0; line-height: 22px; color: transparent; }
 .indicator { position: absolute; width: 10px; height: 10px; border-radius: 50%;
-  border: 2px solid rgba(0,0,0,.3); pointer-events: none; z-index: 5;
-  transform: translate(-50%, -50%); box-shadow: 0 0 4px rgba(0,0,0,.2); }
+  border: 2px solid rgba(0,0,0,.3); cursor: pointer; z-index: 5;
+  transform: translate(-50%, -50%); box-shadow: 0 0 4px rgba(0,0,0,.2);
+  transition: transform .15s; }
+.indicator:hover { transform: translate(-50%, -50%) scale(1.5); }
 .totp-form { display: flex; flex-direction: column; gap: .35rem; padding: .25rem .5rem .5rem; }
+.bookmarks { position: fixed; top: calc(var(--ui-navbar-height) + 12px); right: 12px;
+  background: var(--ui-bg); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md);
+  box-shadow: var(--ui-shadow-lg); padding: .35rem; min-width: 140px; max-width: 220px;
+  z-index: 10; display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
+.bookmark { display: flex; align-items: center; gap: .5rem; padding: .3rem .5rem;
+  border: none; background: none; cursor: pointer; border-radius: var(--ui-radius-sm);
+  font-size: .8rem; color: var(--ui-text); text-align: left; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.bookmark:hover { background: var(--ui-bg-secondary); }
+.bookmark-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,.15); }

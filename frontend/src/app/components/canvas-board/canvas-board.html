@@ -9,6 +9,7 @@
     @for (c of list(); track c.id) {
       <app-card
         [card]="c"
+        [scale]="scale()"
         [highlighted]="highlightedContainerId() === c.id"
         (changed)="replaceLocally($event)"
         (dropped)="onCardDropped($event)"
@@ -22,9 +23,21 @@
       [style.left.px]="ind.x"
       [style.top.px]="ind.y"
       [style.background]="ind.color"
+      (click)="navigateToIndicator(ind); $event.stopPropagation()"
     ></div>
   }
 </div>
+
+@if (containers().length) {
+  <div class="bookmarks">
+    @for (c of containers(); track c.id) {
+      <button class="bookmark" (click)="navigateToCard(c)">
+        <span class="bookmark-dot" [style.background]="c.color"></span>
+        {{ c.text || 'Container' }}
+      </button>
+    }
+  </div>
+}
 
 <input #cp type="color" (change)="onCustomColor($event)" style="display:none" />
 
