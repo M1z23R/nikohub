@@ -1,0 +1,5 @@
+.wrap { display:flex; align-items:center; justify-content:center; height:100vh; }
+.card { background:var(--ui-bg); padding:2rem 2.5rem; border:1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg); box-shadow: var(--ui-shadow-md); text-align:center; }
+h1 { margin: 0 0 .5rem; color: var(--ui-primary); }
+p { color: var(--ui-text-muted); margin: 0 0 1.5rem; }
