@@ -15,6 +15,7 @@ export interface ICard {
   card_type: 'note' | 'image' | 'totp' | 'container' | 'password';
   is_secret: boolean;
   is_favorite: boolean;
+  sidebar_order: number;
   totp_name?: string;
   container_id: string | null;
   title: string;
@@ -51,7 +52,10 @@ export interface ITotpBatchResponse {
 }
 
 export type CardPatch = Partial<
-  Pick<ICard, 'x' | 'y' | 'width' | 'height' | 'color' | 'text' | 'title' | 'z_index' | 'is_secret' | 'is_favorite'>
+  Pick<
+    ICard,
+    'x' | 'y' | 'width' | 'height' | 'color' | 'text' | 'title' | 'z_index' | 'is_secret' | 'is_favorite' | 'sidebar_order'
+  >
 > & { container_id?: string };
 
 @Injectable({ providedIn: 'root' })

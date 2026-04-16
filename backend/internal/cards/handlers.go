@@ -77,9 +77,10 @@ type patchReq struct {
 	Color       *string `json:"color,omitempty"`
 	Text        *string `json:"text,omitempty"`
 	Title       *string `json:"title,omitempty"`
-	IsSecret    *bool   `json:"is_secret,omitempty"`
-	IsFavorite  *bool   `json:"is_favorite,omitempty"`
-	ContainerID *string `json:"container_id,omitempty"`
+	IsSecret     *bool   `json:"is_secret,omitempty"`
+	IsFavorite   *bool   `json:"is_favorite,omitempty"`
+	SidebarOrder *int    `json:"sidebar_order,omitempty"`
+	ContainerID  *string `json:"container_id,omitempty"`
 }
 
 func (h *Handlers) Patch(c *drift.Context) {
@@ -112,6 +113,7 @@ func (h *Handlers) Patch(c *drift.Context) {
 
 	card, err := h.Repo.Update(uid, id, UpdateInput{
 		X: in.X, Y: in.Y, Width: in.Width, Height: in.Height, ZIndex: in.ZIndex,
+		SidebarOrder: in.SidebarOrder,
 		Color: in.Color, Text: in.Text, Title: in.Title, IsSecret: in.IsSecret, IsFavorite: in.IsFavorite,
 		ContainerID: containerID, ClearContainerID: clearContainerID,
 	})

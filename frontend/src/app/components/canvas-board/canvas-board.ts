@@ -84,15 +84,21 @@ export class CanvasBoardComponent {
   private resizeObs?: ResizeObserver;
 
   readonly containers = computed(() =>
-    this.list().filter((c) => c.card_type === 'container'),
+    this.list()
+      .filter((c) => c.card_type === 'container')
+      .sort((a, b) => a.sidebar_order - b.sidebar_order),
   );
 
   readonly favorites = computed(() =>
-    this.list().filter((c) => c.is_favorite && c.card_type !== 'container'),
+    this.list()
+      .filter((c) => c.is_favorite && c.card_type !== 'container')
+      .sort((a, b) => a.sidebar_order - b.sidebar_order),
   );
 
   readonly revealToken = signal<{ id: string; n: number } | null>(null);
   readonly copiedFavoriteId = signal<string | null>(null);
+  readonly dragBookmarkId = signal<string | null>(null);
+  readonly dragOverBookmarkId = signal<string | null>(null);
   private copiedFavTimeout: ReturnType<typeof setTimeout> | null = null;
 
   readonly hasTotps = computed(() => this.list().some((c) => c.card_type === 'totp'));
@@ -609,11 +615,65 @@ export class CanvasBoardComponent {
       if (card.text) await this.copyToClipboard(card.text, card.id);
       return;
     }
-    this.navigateToCard(card);
+    this.navigateToCard(card, true);
     if (card.is_secret) {
       const prev = this.revealToken();
       this.revealToken.set({ id: card.id, n: (prev?.n ?? 0) + 1 });
     }
+  }
+
+  onBookmarkDragStart(ev: DragEvent, id: string) {
+    this.dragBookmarkId.set(id);
+    if (ev.dataTransfer) {
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', id);
+    }
+  }
+
+  onBookmarkDragOver(ev: DragEvent, targetId: string, section: 'containers' | 'favorites') {
+    const src = this.dragBookmarkId();
+    if (!src || src === targetId) return;
+    const list = section === 'containers' ? this.containers() : this.favorites();
+    if (!list.some((c) => c.id === src)) return;
+    ev.preventDefault();
+    if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+    this.dragOverBookmarkId.set(targetId);
+  }
+
+  onBookmarkDragEnd() {
+    this.dragBookmarkId.set(null);
+    this.dragOverBookmarkId.set(null);
+  }
+
+  async onBookmarkDrop(ev: DragEvent, targetId: string, section: 'containers' | 'favorites') {
+    ev.preventDefault();
+    const src = this.dragBookmarkId();
+    this.dragBookmarkId.set(null);
+    this.dragOverBookmarkId.set(null);
+    if (!src || src === targetId) return;
+
+    const sectionList = section === 'containers' ? this.containers() : this.favorites();
+    const srcIdx = sectionList.findIndex((c) => c.id === src);
+    const tgtIdx = sectionList.findIndex((c) => c.id === targetId);
+    if (srcIdx < 0 || tgtIdx < 0) return;
+
+    const reordered = [...sectionList];
+    const [moved] = reordered.splice(srcIdx, 1);
+    reordered.splice(tgtIdx, 0, moved);
+
+    const changes = reordered
+      .map((c, i) => ({ id: c.id, next: i, prev: c.sidebar_order }))
+      .filter((u) => u.next !== u.prev);
+    if (changes.length === 0) return;
+
+    this.list.update((xs) =>
+      xs.map((c) => {
+        const u = changes.find((ch) => ch.id === c.id);
+        return u ? { ...c, sidebar_order: u.next } : c;
+      }),
+    );
+
+    await Promise.all(changes.map((u) => this.cards.patch(u.id, { sidebar_order: u.next })));
   }
 
   favoriteLabel(card: ICard): string {
@@ -636,12 +696,21 @@ export class CanvasBoardComponent {
     this.copiedFavTimeout = setTimeout(() => this.copiedFavoriteId.set(null), 1500);
   }
 
-  navigateToCard(card: ICard) {
+  navigateToCard(card: ICard, fit = false) {
     const bw = this.boardW();
     const bh = this.boardH();
     const cx = card.x + card.width / 2;
     const cy = card.y + card.height / 2;
-    const s = this.scale();
+    let s = this.scale();
+    if (fit && card.width > 0 && card.height > 0) {
+      const PAD = 0.9;
+      const fitScale = Math.min((bw / card.width) * PAD, (bh / card.height) * PAD);
+      s = Math.min(
+        CanvasBoardComponent.MAX_SCALE,
+        Math.max(CanvasBoardComponent.MIN_SCALE, fitScale),
+      );
+      this.scale.set(s);
+    }
     this.panX.set(bw / 2 - cx * s);
     this.panY.set(bh / 2 - cy * s);
   }

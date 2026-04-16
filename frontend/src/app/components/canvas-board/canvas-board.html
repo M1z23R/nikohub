@@ -55,9 +55,18 @@
     @if (containers().length) {
       <div class="bookmarks">
         @for (c of containers(); track c.id) {
-          <button class="bookmark" (click)="navigateToCard(c)">
+          <button class="bookmark"
+            [class.drag-over]="dragOverBookmarkId() === c.id"
+            [class.dragging]="dragBookmarkId() === c.id"
+            draggable="true"
+            (dragstart)="onBookmarkDragStart($event, c.id)"
+            (dragover)="onBookmarkDragOver($event, c.id, 'containers')"
+            (dragleave)="dragOverBookmarkId.set(null)"
+            (drop)="onBookmarkDrop($event, c.id, 'containers')"
+            (dragend)="onBookmarkDragEnd()"
+            (click)="navigateToCard(c, true)">
             <span class="bookmark-dot" [style.background]="c.color"></span>
-            {{ c.text || 'Container' }}
+            <span class="bookmark-label">{{ c.text || 'Container' }}</span>
           </button>
         }
       </div>
@@ -65,7 +74,16 @@
     @if (favorites().length) {
       <div class="bookmarks favorites">
         @for (c of favorites(); track c.id) {
-          <button class="bookmark" (click)="onFavoriteClick(c)">
+          <button class="bookmark"
+            [class.drag-over]="dragOverBookmarkId() === c.id"
+            [class.dragging]="dragBookmarkId() === c.id"
+            draggable="true"
+            (dragstart)="onBookmarkDragStart($event, c.id)"
+            (dragover)="onBookmarkDragOver($event, c.id, 'favorites')"
+            (dragleave)="dragOverBookmarkId.set(null)"
+            (drop)="onBookmarkDrop($event, c.id, 'favorites')"
+            (dragend)="onBookmarkDragEnd()"
+            (click)="onFavoriteClick(c)">
             <span class="bookmark-dot" [style.background]="favoriteDotColor(c)"></span>
             <span class="bookmark-label">{{ favoriteLabel(c) }}</span>
             @if (copiedFavoriteId() === c.id) {
