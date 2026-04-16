@@ -1,0 +1,21 @@
+<div
+  class="card"
+  [style.left.px]="card.x"
+  [style.top.px]="card.y"
+  [style.width.px]="card.width"
+  [style.height.px]="card.height"
+  [style.background]="card.color"
+  [style.zIndex]="card.z_index"
+  (contextmenu)="onContextMenu($event)"
+>
+  <div class="drag" (pointerdown)="onHeaderPointerDown($event)"></div>
+  @if (card.has_image) {
+    <img class="img" [src]="imageUrl()" alt="" draggable="false" />
+  }
+  @if (editing()) {
+    <textarea #ta class="text" [value]="card.text" (blur)="commitEdit()"></textarea>
+  } @else {
+    <div class="text readonly" (dblclick)="startEdit()">{{ card.text }}</div>
+  }
+  <div class="resize" (pointerdown)="onResizePointerDown($event)"></div>
+</div>

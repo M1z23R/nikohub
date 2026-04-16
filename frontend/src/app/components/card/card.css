@@ -1,0 +1,9 @@
+.card { position:absolute; border-radius: var(--ui-radius-md); box-shadow: var(--ui-shadow-md);
+  display:flex; flex-direction:column; overflow:hidden; user-select:none; }
+.drag { height: 20px; cursor: move; background: rgba(0,0,0,.06); touch-action: none; }
+.img { width:100%; max-height: 50%; object-fit: cover; }
+.text { flex:1; padding: .5rem .75rem; font-size: .9rem; color: #1f2937; white-space: pre-wrap;
+  outline: none; border: none; background: transparent; resize: none; font-family: inherit; }
+.readonly { overflow:auto; cursor: text; }
+.resize { position:absolute; right:0; bottom:0; width:14px; height:14px; cursor: se-resize;
+  background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,.2) 50%); touch-action: none; }
