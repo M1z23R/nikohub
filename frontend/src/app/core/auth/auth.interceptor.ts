@@ -4,6 +4,8 @@ import { catchError, from, switchMap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
 
+let refreshPromise: Promise<void> | null = null;
+
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (!req.url.startsWith(environment.apiBase)) return next(req);
   const auth = inject(AuthService);
@@ -15,7 +17,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((err) => {
       if (!(err instanceof HttpErrorResponse) || err.status !== 401) return throwError(() => err);
       if (req.url.endsWith('/auth/refresh') || req.url.endsWith('/auth/logout')) return throwError(() => err);
-      return from(auth.refresh()).pipe(
+
+      if (!refreshPromise) {
+        refreshPromise = auth.refresh().finally(() => (refreshPromise = null));
+      }
+
+      return from(refreshPromise).pipe(
         switchMap(() => {
           const retryToken = auth.accessToken();
           const retryReq = retryToken

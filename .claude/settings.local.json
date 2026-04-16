@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx ng *)"
+      "Bash(npx ng *)",
+      "Bash(grep -r \"deploy\\\\|production\\\\|nginx\\\\|caddy\\\\|docker\" /home/dimitrije/projects/dimitrije/nikohub/*.md)"
     ]
   }
 }

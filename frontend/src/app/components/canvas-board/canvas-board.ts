@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { ButtonComponent, CircularProgressComponent, InputComponent } from '@m1z23r/ngx-ui';
 import { CardComponent } from '../card/card';
 import { ICard, CardService } from '../../core/api/card.service';
@@ -42,10 +42,30 @@ export class CanvasBoardComponent {
   @ViewChild('cp') cp?: ElementRef<HTMLInputElement>;
   private colorPickerCallback: ((color: string) => void) | null = null;
 
+  private static readonly VIEW_STORAGE_KEY = 'canvas-board-view';
+  private static readonly MIN_SCALE = 0.1;
+  private static readonly MAX_SCALE = 3;
+
+  private static loadView(): { panX: number; panY: number; scale: number } {
+    try {
+      const raw = localStorage.getItem(CanvasBoardComponent.VIEW_STORAGE_KEY);
+      if (!raw) return { panX: 0, panY: 0, scale: 1 };
+      const v = JSON.parse(raw);
+      const scale = Math.min(
+        CanvasBoardComponent.MAX_SCALE,
+        Math.max(CanvasBoardComponent.MIN_SCALE, Number(v.scale) || 1),
+      );
+      return { panX: Number(v.panX) || 0, panY: Number(v.panY) || 0, scale };
+    } catch {
+      return { panX: 0, panY: 0, scale: 1 };
+    }
+  }
+
+  private readonly initialView = CanvasBoardComponent.loadView();
   readonly panning = signal(false);
-  readonly panX = signal(0);
-  readonly panY = signal(0);
-  readonly scale = signal(1);
+  readonly panX = signal(this.initialView.panX);
+  readonly panY = signal(this.initialView.panY);
+  readonly scale = signal(this.initialView.scale);
   readonly boardW = signal(0);
   readonly boardH = signal(0);
   readonly selected = signal<Set<string>>(new Set());
@@ -53,8 +73,6 @@ export class CanvasBoardComponent {
   readonly selecting = signal(false);
   readonly snapLines = signal<ISnapLine[]>([]);
 
-  private static readonly MIN_SCALE = 0.1;
-  private static readonly MAX_SCALE = 3;
   private panStartX = 0;
   private panStartY = 0;
   private panOriginX = 0;
@@ -116,6 +134,13 @@ export class CanvasBoardComponent {
     }
     return result;
   });
+
+  constructor() {
+    effect(() => {
+      const view = { panX: this.panX(), panY: this.panY(), scale: this.scale() };
+      localStorage.setItem(CanvasBoardComponent.VIEW_STORAGE_KEY, JSON.stringify(view));
+    });
+  }
 
   async ngOnInit() {
     this.list.set(await this.cards.list());
