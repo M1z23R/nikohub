@@ -1,5 +1,11 @@
-<div #board class="board" (contextmenu)="onBackgroundContextMenu($event)" (click)="closeMenu()">
-  <div class="sheet">
+<div #board class="board"
+  [class.panning]="panning()"
+  (contextmenu)="onBackgroundContextMenu($event)"
+  (pointerdown)="onBoardPointerDown($event)"
+  (wheel)="onWheel($event)"
+  (click)="closeMenu()">
+  <div class="sheet" [style.transform]="'translate(' + panX() + 'px,' + panY() + 'px) scale(' + scale() + ')'"
+    style="transform-origin: 0 0">
     @for (c of list(); track c.id) {
       <app-card
         [card]="c"
@@ -9,6 +15,13 @@
       />
     }
   </div>
+  @for (ind of indicators(); track $index) {
+    <div class="indicator"
+      [style.left.px]="ind.x"
+      [style.top.px]="ind.y"
+      [style.background]="ind.color"
+    ></div>
+  }
 </div>
 
 @if (menu(); as m) {

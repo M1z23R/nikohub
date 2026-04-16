@@ -7,6 +7,7 @@ import (
 
 	nikologs "github.com/M1z23r/nikologs-go"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	"github.com/m1z23r/drift/pkg/drift"
 	"github.com/m1z23r/drift/pkg/middleware"
 	"github.com/m1z23r/nikohub/internal/auth"
@@ -18,6 +19,7 @@ import (
 )
 
 func main() {
+	_ = godotenv.Load()
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
@@ -76,7 +78,7 @@ func main() {
 	api.Delete("/cards/:id", auth.RequireAccess(secret), cardH.Delete)
 	api.Post("/cards/:id/image", auth.RequireAccess(secret), cardH.UploadImage)
 	api.Delete("/cards/:id/image", auth.RequireAccess(secret), cardH.DeleteImage)
-	api.Get("/cards/:id/image", auth.RequireAccess(secret), cardH.GetImage)
+	api.Get("/cards/:id/image", auth.RequireAccessOrCookie(secret, pg), cardH.GetImage)
 
 	nlog.Info("server starting", nikologs.Fields{"port": cfg.Port})
 	if err := app.Run(":" + cfg.Port); err != nil {

@@ -13,9 +13,9 @@
     <img class="img" [src]="imageUrl()" alt="" draggable="false" />
   }
   @if (editing()) {
-    <textarea #ta class="text" [value]="card.text" (blur)="commitEdit()"></textarea>
+    <textarea #ta class="text" [value]="card.text" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
   } @else {
-    <div class="text readonly" (dblclick)="startEdit()">{{ card.text }}</div>
+    <div class="text readonly" (dblclick)="onTextDblClick($event)">{{ card.text }}</div>
   }
   <div class="resize" (pointerdown)="onResizePointerDown($event)"></div>
 </div>

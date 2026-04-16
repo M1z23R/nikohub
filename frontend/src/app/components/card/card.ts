@@ -66,7 +66,7 @@ export class CardComponent {
     const dx = ev.clientX - this.startX;
     const dy = ev.clientY - this.startY;
     if (this.mode === 'move') {
-      this.card = { ...this.card, x: Math.max(0, this.origX + dx), y: Math.max(0, this.origY + dy) };
+      this.card = { ...this.card, x: this.origX + dx, y: this.origY + dy };
     } else if (this.mode === 'resize') {
       this.card = {
         ...this.card,
@@ -104,9 +104,10 @@ export class CardComponent {
     this.contextRequested.emit({ card: this.card, x: ev.clientX, y: ev.clientY });
   }
 
-  startEdit() {
+  onTextDblClick(ev: MouseEvent) {
+    ev.stopPropagation();
     this.editing.set(true);
-    queueMicrotask(() => this.ta?.nativeElement.focus());
+    requestAnimationFrame(() => this.ta?.nativeElement.focus());
   }
 
   async commitEdit() {

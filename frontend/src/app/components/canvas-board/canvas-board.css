@@ -1,6 +1,7 @@
-.board { position: relative; height: calc(100vh - var(--ui-navbar-height)); overflow: auto;
-  background: var(--ui-bg-secondary); }
-.sheet { position: relative; width: 10000px; height: 10000px; }
+.board { position: relative; height: calc(100vh - var(--ui-navbar-height)); overflow: hidden;
+  background: var(--ui-bg-secondary); cursor: grab; }
+.board.panning { cursor: grabbing; user-select: none; }
+.sheet { position: absolute; top: 0; left: 0; will-change: transform; }
 .menu { position: fixed; background: var(--ui-bg); border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md); box-shadow: var(--ui-shadow-lg); padding: .5rem; min-width: 180px;
   z-index: 100; font-size: .9rem; }
@@ -11,3 +12,6 @@
   cursor: pointer; font: inherit; color: inherit; border-radius: var(--ui-radius-sm); }
 .item:hover { background: var(--ui-bg-hover); }
 .item.danger { color: var(--ui-danger); }
+.indicator { position: absolute; width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.3); pointer-events: none; z-index: 5;
+  transform: translate(-50%, -50%); box-shadow: 0 0 4px rgba(0,0,0,.2); }

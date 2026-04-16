@@ -1,6 +1,6 @@
 .card { position:absolute; border-radius: var(--ui-radius-md); box-shadow: var(--ui-shadow-md);
-  display:flex; flex-direction:column; overflow:hidden; user-select:none; }
-.drag { height: 20px; cursor: move; background: rgba(0,0,0,.06); touch-action: none; }
+  display:flex; flex-direction:column; overflow:hidden; }
+.drag { height: 20px; cursor: move; background: rgba(0,0,0,.06); touch-action: none; user-select: none; }
 .img { width:100%; max-height: 50%; object-fit: cover; }
 .text { flex:1; padding: .5rem .75rem; font-size: .9rem; color: #1f2937; white-space: pre-wrap;
   outline: none; border: none; background: transparent; resize: none; font-family: inherit; }
