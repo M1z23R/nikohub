@@ -85,8 +85,10 @@ function edgeAxisSnap(
   };
 }
 
+const DEFAULT_GAP = 10;
+
 function collectGaps(siblings: IRect[], axis: 'x' | 'y'): number[] {
-  const gaps = new Set<number>();
+  const gaps = new Set<number>([DEFAULT_GAP]);
   for (let i = 0; i < siblings.length; i++) {
     for (let j = i + 1; j < siblings.length; j++) {
       const a = siblings[i], b = siblings[j];
