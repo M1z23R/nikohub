@@ -1,10 +1,9 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { http, setAccessToken, setAuthHandlers } from '../api/http';
 
-export interface User {
+export interface IUser {
   id: string;
   email: string;
   name: string;
@@ -12,25 +11,31 @@ export interface User {
   created_at: string;
 }
 
-interface RefreshResponse {
+interface IRefreshResponse {
   accessToken: string;
-  user: User;
+  user: IUser;
 }
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private http = inject(HttpClient);
   private router = inject(Router);
 
   readonly accessToken = signal<string | null>(null);
-  readonly user = signal<User | null>(null);
+  readonly user = signal<IUser | null>(null);
   readonly ready = signal(false);
+
+  constructor() {
+    setAuthHandlers({
+      refresh: () => this.refresh(),
+      logout: () => this.logout(),
+    });
+  }
 
   async init(): Promise<void> {
     try {
       await this.refresh();
     } catch {
-      this.accessToken.set(null);
+      this.setToken(null);
       this.user.set(null);
     } finally {
       this.ready.set(true);
@@ -38,11 +43,9 @@ export class AuthService {
   }
 
   async refresh(): Promise<void> {
-    const r = await firstValueFrom(
-      this.http.post<RefreshResponse>(`${environment.apiBase}/auth/refresh`, {}, { withCredentials: true }),
-    );
-    this.accessToken.set(r.accessToken);
-    this.user.set(r.user);
+    const { data } = await http.post<IRefreshResponse>('/auth/refresh', {});
+    this.setToken(data.accessToken);
+    this.user.set(data.user);
   }
 
   loginWithGoogle(): void {
@@ -51,12 +54,15 @@ export class AuthService {
 
   async logout(): Promise<void> {
     try {
-      await firstValueFrom(
-        this.http.post(`${environment.apiBase}/auth/logout`, {}, { withCredentials: true }),
-      );
+      await http.post('/auth/logout', {});
     } catch {}
-    this.accessToken.set(null);
+    this.setToken(null);
     this.user.set(null);
     this.router.navigateByUrl('/login');
+  }
+
+  private setToken(token: string | null): void {
+    this.accessToken.set(token);
+    setAccessToken(token);
   }
 }

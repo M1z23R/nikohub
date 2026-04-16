@@ -1,7 +1,6 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { Injectable } from '@angular/core';
 import { environment } from '../../../environments/environment';
+import { http } from './http';
 
 export interface ICard {
   id: string;
@@ -48,58 +47,81 @@ export interface ITotpBatchResponse {
   period: number;
 }
 
-export type CardPatch = Partial<Pick<ICard, 'x' | 'y' | 'width' | 'height' | 'color' | 'text' | 'title' | 'z_index' | 'is_secret'>> & { container_id?: string };
+export type CardPatch = Partial<
+  Pick<ICard, 'x' | 'y' | 'width' | 'height' | 'color' | 'text' | 'title' | 'z_index' | 'is_secret'>
+> & { container_id?: string };
 
 @Injectable({ providedIn: 'root' })
 export class CardService {
-  private http = inject(HttpClient);
-  private base = `${environment.apiBase}/cards`;
-  private totpBase = `${environment.apiBase}/totps`;
+  private base = '/cards';
+  private totpBase = '/totps';
 
-  list(): Promise<ICard[]> {
-    return firstValueFrom(this.http.get<ICard[]>(this.base));
+  async list(): Promise<ICard[]> {
+    const { data } = await http.get<ICard[]>(this.base);
+    return data;
   }
 
-  create(body: { x: number; y: number; width?: number; height?: number; color?: string; text?: string; title?: string; card_type?: string; is_secret?: boolean }): Promise<ICard> {
-    return firstValueFrom(this.http.post<ICard>(this.base, body));
+  async create(body: {
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    color?: string;
+    text?: string;
+    title?: string;
+    card_type?: string;
+    is_secret?: boolean;
+  }): Promise<ICard> {
+    const { data } = await http.post<ICard>(this.base, body);
+    return data;
   }
 
-  patch(id: string, body: CardPatch): Promise<ICard> {
+  async patch(id: string, body: CardPatch): Promise<ICard> {
     const rounded = { ...body };
     if (rounded.x != null) rounded.x = Math.round(rounded.x);
     if (rounded.y != null) rounded.y = Math.round(rounded.y);
     if (rounded.width != null) rounded.width = Math.round(rounded.width);
     if (rounded.height != null) rounded.height = Math.round(rounded.height);
-    return firstValueFrom(this.http.patch<ICard>(`${this.base}/${id}`, rounded));
+    const { data } = await http.patch<ICard>(`${this.base}/${id}`, rounded);
+    return data;
   }
 
-  delete(id: string): Promise<void> {
-    return firstValueFrom(this.http.delete<void>(`${this.base}/${id}`));
+  async delete(id: string): Promise<void> {
+    await http.delete<void>(`${this.base}/${id}`);
   }
 
-  uploadImage(id: string, file: File): Promise<void> {
+  async uploadImage(id: string, file: File): Promise<void> {
     const form = new FormData();
     form.append('file', file);
-    return firstValueFrom(this.http.post<void>(`${this.base}/${id}/image`, form));
+    await http.post<void>(`${this.base}/${id}/image`, form);
   }
 
-  removeImage(id: string): Promise<void> {
-    return firstValueFrom(this.http.delete<void>(`${this.base}/${id}/image`));
+  async removeImage(id: string): Promise<void> {
+    await http.delete<void>(`${this.base}/${id}/image`);
   }
 
-  createTotp(body: { x: number; y: number; color?: string; totp_secret: string; totp_name: string }): Promise<ICard> {
-    return firstValueFrom(this.http.post<ICard>(this.base, { ...body, card_type: 'totp' }));
+  async createTotp(body: {
+    x: number;
+    y: number;
+    color?: string;
+    totp_secret: string;
+    totp_name: string;
+  }): Promise<ICard> {
+    const { data } = await http.post<ICard>(this.base, { ...body, card_type: 'totp' });
+    return data;
   }
 
-  getTotp(id: string): Promise<ITotpCode> {
-    return firstValueFrom(this.http.get<ITotpCode>(`${this.totpBase}/${id}`));
+  async getTotp(id: string): Promise<ITotpCode> {
+    const { data } = await http.get<ITotpCode>(`${this.totpBase}/${id}`);
+    return data;
   }
 
-  getAllTotp(): Promise<ITotpBatchResponse> {
-    return firstValueFrom(this.http.get<ITotpBatchResponse>(this.totpBase));
+  async getAllTotp(): Promise<ITotpBatchResponse> {
+    const { data } = await http.get<ITotpBatchResponse>(this.totpBase);
+    return data;
   }
 
   imageUrl(id: string, updatedAt: string): string {
-    return `${this.base}/${id}/image?v=${encodeURIComponent(updatedAt)}`;
+    return `${environment.apiBase}${this.base}/${id}/image?v=${encodeURIComponent(updatedAt)}`;
   }
 }

@@ -13,7 +13,7 @@
         [scale]="scale()"
         [highlighted]="highlightedContainerId() === c.id"
         [isSelected]="selected().has(c.id)"
-        [totpCode]="totpCodes()[c.id] ?? ''"
+        [totpCode]="totpCodes()[c.id]"
         (changed)="replaceLocally($event)"
         (dropped)="onCardDropped($event)"
         (moveStarted)="onCardDragStart($event)"
