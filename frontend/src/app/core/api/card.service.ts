@@ -54,6 +54,7 @@ export type CardPatch = Partial<Pick<ICard, 'x' | 'y' | 'width' | 'height' | 'co
 export class CardService {
   private http = inject(HttpClient);
   private base = `${environment.apiBase}/cards`;
+  private totpBase = `${environment.apiBase}/totps`;
 
   list(): Promise<ICard[]> {
     return firstValueFrom(this.http.get<ICard[]>(this.base));
@@ -91,11 +92,11 @@ export class CardService {
   }
 
   getTotp(id: string): Promise<ITotpCode> {
-    return firstValueFrom(this.http.get<ITotpCode>(`${this.base}/${id}/totp`));
+    return firstValueFrom(this.http.get<ITotpCode>(`${this.totpBase}/${id}`));
   }
 
   getAllTotp(): Promise<ITotpBatchResponse> {
-    return firstValueFrom(this.http.get<ITotpBatchResponse>(`${this.base}/totp`));
+    return firstValueFrom(this.http.get<ITotpBatchResponse>(this.totpBase));
   }
 
   imageUrl(id: string, updatedAt: string): string {
