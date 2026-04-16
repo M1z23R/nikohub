@@ -272,8 +272,8 @@ export class CanvasBoardComponent {
   async bringToFront(card: ICard) {
     const maxZ = this.list().reduce((m, c) => Math.max(m, c.z_index), 0);
     if (card.z_index === maxZ) return;
-    const updated = await this.cards.patch(card.id, { z_index: maxZ + 1 });
-    this.list.update((xs) => xs.map((c) => (c.id === updated.id ? updated : c)));
+    this.list.update((xs) => xs.map((c) => (c.id === card.id ? { ...c, z_index: maxZ + 1 } : c)));
+    await this.cards.patch(card.id, { z_index: maxZ + 1 });
   }
 
   async deleteCard() {
