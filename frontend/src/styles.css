@@ -1,0 +1,12 @@
+:root {
+  --ui-primary: #6366f1;
+  --ui-primary-hover: #4f46e5;
+  --ui-primary-active: #4338ca;
+  --ui-bg: #fafafa;
+  --ui-bg-secondary: #f4f4f5;
+  --ui-text: #18181b;
+  --ui-border: #e4e4e7;
+}
+
+html, body { height: 100%; margin: 0; background: var(--ui-bg); color: var(--ui-text);
+  font-family: system-ui, -apple-system, sans-serif; }
