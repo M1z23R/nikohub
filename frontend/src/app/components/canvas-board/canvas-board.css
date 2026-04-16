@@ -14,6 +14,10 @@
 .board.selecting { cursor: crosshair; user-select: none; }
 .sel-rect { position: absolute; border: 1px solid rgba(99, 102, 241, .6);
   background: rgba(99, 102, 241, .08); pointer-events: none; z-index: 9999; border-radius: 2px; }
+.snap-line { position: absolute; background: rgba(99, 102, 241, .7); pointer-events: none; z-index: 9998; }
+.snap-line.vertical { width: 1px; }
+.snap-line.horizontal { height: 1px; }
+.snap-line.gap { background: rgba(236, 72, 153, .7); }
 .indicator { position: absolute; width: 18px; height: 18px; border-radius: 50%;
   border: 2px solid rgba(0,0,0,.3); cursor: pointer; z-index: 5;
   transform: translate(-50%, -50%); box-shadow: 0 0 4px rgba(0,0,0,.2);

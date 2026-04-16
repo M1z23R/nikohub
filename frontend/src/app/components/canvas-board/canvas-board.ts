@@ -2,6 +2,7 @@ import { Component, ElementRef, ViewChild, computed, inject, signal } from '@ang
 import { ButtonComponent, InputComponent } from '@m1z23r/ngx-ui';
 import { CardComponent } from '../card/card';
 import { ICard, CardService } from '../../core/api/card.service';
+import { SnapContext, ISnapLine } from '../../core/snap';
 
 export interface EdgeIndicator {
   x: number;
@@ -27,6 +28,7 @@ type Menu =
 })
 export class CanvasBoardComponent {
   private cards = inject(CardService);
+  private snapCtx = inject(SnapContext);
   readonly colors = COLORS;
   readonly list = signal<ICard[]>([]);
   readonly menu = signal<Menu>(null);
@@ -49,6 +51,7 @@ export class CanvasBoardComponent {
   readonly selected = signal<Set<string>>(new Set());
   readonly selRect = signal<{ x: number; y: number; w: number; h: number } | null>(null);
   readonly selecting = signal(false);
+  readonly snapLines = signal<ISnapLine[]>([]);
 
   private static readonly MIN_SCALE = 0.1;
   private static readonly MAX_SCALE = 3;
@@ -257,10 +260,37 @@ export class CanvasBoardComponent {
     }
   }
 
+  onCardClick(ev: MouseEvent, card: ICard) {
+    if (ev.ctrlKey || ev.metaKey) {
+      const sel = new Set(this.selected());
+      if (sel.has(card.id)) {
+        sel.delete(card.id);
+      } else {
+        sel.add(card.id);
+      }
+      this.selected.set(sel);
+      return;
+    }
+    this.bringToFront(card);
+  }
+
   onCardDragStart(cardId: string) {
     if (!this.selected().has(cardId)) {
       this.selected.set(new Set());
     }
+
+    const card = this.list().find((c) => c.id === cardId);
+    if (!card) return;
+    const sel = this.selected();
+    const siblings = this.list().filter((c) =>
+      c.id !== cardId &&
+      !sel.has(c.id) &&
+      (c.container_id ?? null) === (card.container_id ?? null),
+    );
+    this.snapCtx.activate(
+      siblings.map((c) => ({ x: c.x, y: c.y, width: c.width, height: c.height })),
+      (lines) => this.snapLines.set(lines),
+    );
   }
 
   async createSecretNoteAt(color: string) {
@@ -459,7 +489,7 @@ export class CanvasBoardComponent {
         return null;
       };
 
-      const patches: Promise<unknown>[] = [];
+      const patches: Promise<ICard>[] = [];
 
       for (const sc of allCards) {
         if (sc.id === card.id) continue;
@@ -485,7 +515,9 @@ export class CanvasBoardComponent {
       }
 
       if (patches.length > 0) {
-        await Promise.all(patches);
+        const results = await Promise.all(patches);
+        const updated = new Map(results.map((r) => [r.id, r]));
+        this.list.update((xs) => xs.map((c) => updated.get(c.id) ?? c));
       }
       this.selected.set(new Set());
       return;

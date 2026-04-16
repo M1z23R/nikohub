@@ -12,6 +12,7 @@ import {
 } from '@angular/core';
 import { CircularProgressComponent } from '@m1z23r/ngx-ui';
 import { ICard, CardService, CardPatch } from '../../core/api/card.service';
+import { SnapContext } from '../../core/snap';
 
 type DragMode = 'move' | 'resize' | null;
 
@@ -24,6 +25,7 @@ type DragMode = 'move' | 'resize' | null;
 })
 export class CardComponent implements OnInit, OnDestroy {
   private cards = inject(CardService);
+  private snapCtx = inject(SnapContext);
 
   @Input({ required: true }) card!: ICard;
   @Input() highlighted = false;
@@ -128,12 +130,14 @@ export class CardComponent implements OnInit, OnDestroy {
 
   onHeaderPointerDown(ev: PointerEvent) {
     if (this.editing()) return;
+    if (ev.ctrlKey || ev.metaKey) return;
     this.moveStarted.emit(this.card.id);
     this.mode = 'move';
     this.startDrag(ev);
   }
 
   onResizePointerDown(ev: PointerEvent) {
+    this.moveStarted.emit(this.card.id);
     this.mode = 'resize';
     this.startDrag(ev);
     ev.stopPropagation();
@@ -156,19 +160,27 @@ export class CardComponent implements OnInit, OnDestroy {
     const dx = (ev.clientX - this.startX) / this.scale;
     const dy = (ev.clientY - this.startY) / this.scale;
     if (this.mode === 'move') {
-      this.card = { ...this.card, x: this.origX + dx, y: this.origY + dy };
+      let x = this.origX + dx;
+      let y = this.origY + dy;
+      const snap = this.snapCtx.snapMove({ x, y, width: this.card.width, height: this.card.height });
+      if (snap) { x = snap.x; y = snap.y; }
+      this.card = { ...this.card, x, y };
     } else if (this.mode === 'resize') {
-      this.card = {
-        ...this.card,
-        width: Math.max(120, this.origW + dx),
-        height: Math.max(90, this.origH + dy),
-      };
+      let width = Math.max(120, this.origW + dx);
+      let height = Math.max(90, this.origH + dy);
+      const snap = this.snapCtx.snapResize({ x: this.card.x, y: this.card.y, width, height });
+      if (snap) {
+        width = Math.max(120, snap.width);
+        height = Math.max(90, snap.height);
+      }
+      this.card = { ...this.card, width, height };
     }
     this.changed.emit(this.card);
   };
 
   private onUp = async () => {
     window.removeEventListener('pointermove', this.onMove);
+    this.snapCtx.deactivate();
     const mode = this.mode;
     this.mode = null;
     if (mode === 'move') {

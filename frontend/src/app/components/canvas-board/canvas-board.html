@@ -17,12 +17,25 @@
         (dropped)="onCardDropped($event)"
         (moveStarted)="onCardDragStart($event)"
         (contextRequested)="onCardContextRequested($event)"
-        (click)="bringToFront(c)"
+        (click)="onCardClick($event, c)"
       />
     }
     @if (selRect(); as r) {
       <div class="sel-rect" [style.left.px]="r.x" [style.top.px]="r.y"
         [style.width.px]="r.w" [style.height.px]="r.h"></div>
+    }
+    @for (line of snapLines(); track $index) {
+      @if (line.orientation === 'v') {
+        <div class="snap-line vertical" [class.gap]="line.type === 'gap'"
+          [style.left.px]="line.position"
+          [style.top.px]="line.start"
+          [style.height.px]="line.end - line.start"></div>
+      } @else {
+        <div class="snap-line horizontal" [class.gap]="line.type === 'gap'"
+          [style.left.px]="line.start"
+          [style.top.px]="line.position"
+          [style.width.px]="line.end - line.start"></div>
+      }
     }
   </div>
   @for (ind of indicators(); track $index) {
