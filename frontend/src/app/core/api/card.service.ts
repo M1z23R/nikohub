@@ -4,6 +4,7 @@ import { http } from './http';
 
 export interface ICard {
   id: string;
+  workspace_id: string | null;
   x: number;
   y: number;
   width: number;
@@ -46,12 +47,14 @@ export class CardService {
   private base = '/cards';
   private totpBase = '/totps';
 
-  async list(): Promise<ICard[]> {
-    const { data } = await http.get<ICard[]>(this.base);
+  async list(workspaceId: string | null): Promise<ICard[]> {
+    const qs = workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
+    const { data } = await http.get<ICard[]>(`${this.base}${qs}`);
     return data;
   }
 
   async create(body: {
+    workspace_id: string | null;
     x: number;
     y: number;
     width?: number;
@@ -62,7 +65,9 @@ export class CardService {
     card_type?: string;
     is_secret?: boolean;
   }): Promise<ICard> {
-    const { data } = await http.post<ICard>(this.base, body);
+    const payload: any = { ...body };
+    if (body.workspace_id === null) delete payload.workspace_id;
+    const { data } = await http.post<ICard>(this.base, payload);
     return data;
   }
 
@@ -91,13 +96,16 @@ export class CardService {
   }
 
   async createTotp(body: {
+    workspace_id: string | null;
     x: number;
     y: number;
     color?: string;
     totp_secret: string;
     totp_name: string;
   }): Promise<ICard> {
-    const { data } = await http.post<ICard>(this.base, { ...body, card_type: 'totp' });
+    const payload: any = { ...body, card_type: 'totp' };
+    if (body.workspace_id === null) delete payload.workspace_id;
+    const { data } = await http.post<ICard>(this.base, payload);
     return data;
   }
 
@@ -106,8 +114,9 @@ export class CardService {
     return data;
   }
 
-  async getAllTotp(): Promise<ITotpBatchResponse> {
-    const { data } = await http.get<ITotpBatchResponse>(this.totpBase);
+  async getAllTotp(workspaceId: string | null): Promise<ITotpBatchResponse> {
+    const qs = workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
+    const { data } = await http.get<ITotpBatchResponse>(`${this.totpBase}${qs}`);
     return data;
   }
 

@@ -3,6 +3,7 @@ import { ButtonComponent, CircularProgressComponent, InputComponent } from '@m1z
 import { CardComponent } from '../card/card';
 import { ICard, CardService } from '../../core/api/card.service';
 import { CardTypeColorsService } from '../../core/api/card-type-colors.service';
+import { WorkspaceService } from '../../core/workspace/workspace.service';
 import { SnapContext, ISnapLine } from '../../core/snap';
 
 export interface EdgeIndicator {
@@ -31,6 +32,7 @@ export class CanvasBoardComponent {
   private cards = inject(CardService);
   private snapCtx = inject(SnapContext);
   private colorsSvc = inject(CardTypeColorsService);
+  private workspaces = inject(WorkspaceService);
   readonly colors = COLORS;
   readonly list = signal<ICard[]>([]);
   readonly menu = signal<Menu>(null);
@@ -162,7 +164,7 @@ export class CanvasBoardComponent {
   }
 
   async ngOnInit() {
-    const [cards] = await Promise.all([this.cards.list(), this.colorsSvc.load()]);
+    const [cards] = await Promise.all([this.cards.list(this.workspaces.active().id), this.colorsSvc.load()]);
     this.list.set(cards);
     this.updateBoardSize();
     this.resizeObs = new ResizeObserver(() => this.updateBoardSize());
@@ -180,7 +182,7 @@ export class CanvasBoardComponent {
   private async fetchAllTotp() {
     if (!this.hasTotps()) return;
     try {
-      const res = await this.cards.getAllTotp();
+      const res = await this.cards.getAllTotp(this.workspaces.active().id);
       this.totpCodes.set(
         Object.fromEntries(Object.entries(res.codes).map(([id, e]) => [id, e.code])),
       );
@@ -391,6 +393,7 @@ export class CanvasBoardComponent {
     const m = this.menu();
     if (!m || m.kind !== 'empty') return;
     const created = await this.cards.create({
+      workspace_id: this.workspaces.active().id,
       x: Math.round(m.canvasX), y: Math.round(m.canvasY),
       ...(isSecret ? { is_secret: true } : {}),
     });
@@ -401,7 +404,7 @@ export class CanvasBoardComponent {
   async createImageAt() {
     const m = this.menu();
     if (!m || m.kind !== 'empty') return;
-    const created = await this.cards.create({ x: Math.round(m.canvasX), y: Math.round(m.canvasY), card_type: 'image' });
+    const created = await this.cards.create({ workspace_id: this.workspaces.active().id, x: Math.round(m.canvasX), y: Math.round(m.canvasY), card_type: 'image' });
     this.list.update((xs) => [...xs, created]);
     this.closeMenu();
     setTimeout(() => {
@@ -415,6 +418,7 @@ export class CanvasBoardComponent {
     if (!m || m.kind !== 'empty') return;
     if (!this.passwordFormName.trim() || !this.passwordFormValue) return;
     const created = await this.cards.create({
+      workspace_id: this.workspaces.active().id,
       x: Math.round(m.canvasX),
       y: Math.round(m.canvasY),
       card_type: 'password',
@@ -430,6 +434,7 @@ export class CanvasBoardComponent {
     if (!m || m.kind !== 'empty') return;
     if (!this.totpFormName.trim() || !this.totpFormSecret.trim()) return;
     const created = await this.cards.createTotp({
+      workspace_id: this.workspaces.active().id,
       x: Math.round(m.canvasX),
       y: Math.round(m.canvasY),
       totp_name: this.totpFormName.trim(),
@@ -444,6 +449,7 @@ export class CanvasBoardComponent {
     const m = this.menu();
     if (!m || m.kind !== 'empty') return;
     const created = await this.cards.create({
+      workspace_id: this.workspaces.active().id,
       x: Math.round(m.canvasX),
       y: Math.round(m.canvasY),
       width: 400,
@@ -548,7 +554,7 @@ export class CanvasBoardComponent {
       return;
     }
     await this.cards.uploadImage(m.card.id, file);
-    this.list.set(await this.cards.list());
+    this.list.set(await this.cards.list(this.workspaces.active().id));
     this.closeMenu();
   }
 
@@ -556,7 +562,7 @@ export class CanvasBoardComponent {
     const m = this.menu();
     if (!m || m.kind !== 'card') return;
     await this.cards.removeImage(m.card.id);
-    this.list.set(await this.cards.list());
+    this.list.set(await this.cards.list(this.workspaces.active().id));
     this.closeMenu();
   }
 
