@@ -3,6 +3,7 @@
   [class.selecting]="selecting()"
   (contextmenu)="onBackgroundContextMenu($event)"
   (pointerdown)="onBoardPointerDown($event)"
+  (pointermove)="onBoardPointerMove($event)"
   (wheel)="onWheel($event)"
   (click)="onBoardClick($event)">
   <div class="sheet" [style.transform]="'translate(' + panX() + 'px,' + panY() + 'px) scale(' + scale() + ')'"
@@ -38,6 +39,14 @@
           [style.top.px]="line.position"
           [style.width.px]="line.end - line.start"></div>
       }
+    }
+    @for (cur of remoteCursors(); track cur.userId) {
+      <div class="remote-cursor"
+           [style.left.px]="cur.x"
+           [style.top.px]="cur.y">
+        <div class="dot" [style.background]="cur.color"></div>
+        <div class="label" [style.background]="cur.color">{{ cur.name }}</div>
+      </div>
     }
   </div>
   @for (ind of indicators(); track $index) {

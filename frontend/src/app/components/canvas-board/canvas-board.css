@@ -51,3 +51,27 @@
   pointer-events: none; }
 .totp-float-label { text-transform: uppercase; letter-spacing: .04em; color: var(--ui-text-muted);
   font-size: .65rem; font-weight: 600; }
+.remote-cursor {
+  position: absolute;
+  pointer-events: none;
+  transform: translate(-4px, -4px);
+  z-index: 100;
+}
+.remote-cursor .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.remote-cursor .label {
+  position: absolute;
+  top: 14px;
+  left: 8px;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}

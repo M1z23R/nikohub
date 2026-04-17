@@ -81,6 +81,8 @@ export class CanvasBoardComponent {
   readonly selecting = signal(false);
   readonly snapLines = signal<ISnapLine[]>([]);
 
+  readonly remoteCursors = computed(() => Array.from(this.realtime.cursors().values()));
+
   private panStartX = 0;
   private panStartY = 0;
   private panOriginX = 0;
@@ -88,6 +90,7 @@ export class CanvasBoardComponent {
   private didPan = false;
   private didSelect = false;
   private resizeObs?: ResizeObserver;
+  private lastCursorSent = 0;
 
   readonly containers = computed(() =>
     this.list()
@@ -315,6 +318,17 @@ export class CanvasBoardComponent {
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp, { once: true });
     }
+  }
+
+  onBoardPointerMove(ev: PointerEvent): void {
+    if (this.workspaces.active().id === null) return;
+    const now = performance.now();
+    if (now - this.lastCursorSent < 50) return;
+    this.lastCursorSent = now;
+    const rect = this.board.nativeElement.getBoundingClientRect();
+    const canvasX = (ev.clientX - rect.left - this.panX()) / this.scale();
+    const canvasY = (ev.clientY - rect.top - this.panY()) / this.scale();
+    this.realtime.sendCursor(canvasX, canvasY);
   }
 
   onWheel(ev: WheelEvent) {
