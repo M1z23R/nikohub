@@ -52,14 +52,14 @@ export class CardComponent implements OnInit, OnDestroy {
 
   readonly isViewer = computed(() => this.workspaces.active().role === 'viewer');
 
-  readonly displayText = computed(() => {
+  get displayText(): string {
     const c = this.card;
     if (!this.isViewer()) return c.text;
     if (c.card_type === 'password' || (c.card_type === 'note' && c.is_secret)) {
       return '••• hidden •••';
     }
     return c.text;
-  });
+  }
   @ViewChild('ta') ta?: ElementRef<HTMLTextAreaElement>;
   @ViewChild('titleInput') titleInput?: ElementRef<HTMLInputElement>;
 

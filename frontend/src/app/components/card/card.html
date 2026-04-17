@@ -72,7 +72,7 @@
     } @else if (editing()) {
       <textarea #ta class="text" [value]="card.text" [disabled]="isViewer()" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
     } @else {
-      <div class="text readonly password-text" (click)="copyText()" (dblclick)="onTextDblClick($event)">{{ displayText() }}
+      <div class="text readonly password-text" (click)="copyText()" (dblclick)="onTextDblClick($event)">{{ displayText }}
         @if (copied()) {
           <span class="copied-overlay">Copied!</span>
         }
@@ -110,7 +110,7 @@
     } @else if (editing()) {
       <textarea #ta class="text" [value]="card.text" [disabled]="isViewer()" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
     } @else {
-      <div class="text readonly" (dblclick)="onTextDblClick($event)">{{ displayText() }}</div>
+      <div class="text readonly" (dblclick)="onTextDblClick($event)">{{ displayText }}</div>
     }
   }
 
