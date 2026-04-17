@@ -1,27 +1,27 @@
 <div
   class="card"
-  [class.container]="card.card_type === 'container'"
-  [class.highlighted]="highlighted"
-  [class.selected]="isSelected"
-  [style.left.px]="card.x"
-  [style.top.px]="card.y"
-  [style.width.px]="card.width"
-  [style.height.px]="card.height"
-  [style.background]="cardBackground"
-  [style.zIndex]="card.z_index"
+  [class.container]="card().card_type === 'container'"
+  [class.highlighted]="highlighted()"
+  [class.selected]="isSelected()"
+  [style.left.px]="card().x"
+  [style.top.px]="card().y"
+  [style.width.px]="card().width"
+  [style.height.px]="card().height"
+  [style.background]="cardBackground()"
+  [style.zIndex]="card().z_index"
   (contextmenu)="onContextMenu($event)"
 >
   <div class="drag" (pointerdown)="onHeaderPointerDown($event)">
-    @if (card.card_type !== 'container') {
-      <button class="star-btn" [class.active]="card.is_favorite"
+    @if (card().card_type !== 'container') {
+      <button class="star-btn" [class.active]="card().is_favorite"
         (pointerdown)="$event.stopPropagation()" (click)="toggleFavorite()">
-        <svg viewBox="0 0 24 24" [attr.fill]="card.is_favorite ? 'currentColor' : 'none'"
+        <svg viewBox="0 0 24 24" [attr.fill]="card().is_favorite ? 'currentColor' : 'none'"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
         </svg>
       </button>
     }
-    @if (isHidden) {
+    @if (isHidden()) {
       <button class="eye-btn" (pointerdown)="$event.stopPropagation()" (click)="toggleReveal()">
         @if (revealed()) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -38,9 +38,9 @@
     }
   </div>
 
-  @if (card.card_type === 'totp') {
+  @if (card().card_type === 'totp') {
     <div class="totp-body" (click)="copyText()">
-      <div class="totp-name">{{ card.totp_name }}</div>
+      <div class="totp-name">{{ card().totp_name }}</div>
       <div class="totp-row">
         <div class="totp-code">
           @if (revealed()) {
@@ -54,53 +54,53 @@
         <div class="totp-copied">Copied!</div>
       }
     </div>
-  } @else if (card.card_type === 'password') {
+  } @else if (card().card_type === 'password') {
     @if (editingTitle()) {
-      <input #titleInput class="card-title-input" [value]="card.title" [disabled]="isViewer()"
+      <input #titleInput class="card-title-input" [value]="card().title" [disabled]="isViewer()"
         (blur)="commitTitleEdit()" (keydown.escape)="commitTitleEdit()" (keydown.enter)="commitTitleEdit()"
         (pointerdown)="$event.stopPropagation()" />
     } @else {
-      <div class="card-title" (dblclick)="onTitleDblClick($event)">{{ card.title || 'Password' }}</div>
+      <div class="card-title" (dblclick)="onTitleDblClick($event)">{{ card().title || 'Password' }}</div>
     }
     @if (!revealed()) {
       <div class="secret-body" (click)="copyText()">
-        <div class="text readonly masked">{{ card.text ? maskedText() : 'Click to set' }}</div>
+        <div class="text readonly masked">{{ card().text ? maskedText() : 'Click to set' }}</div>
         @if (copied()) {
           <span class="copied-overlay">Copied!</span>
         }
       </div>
     } @else if (editing()) {
-      <textarea #ta class="text" [value]="card.text" [disabled]="isViewer()" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
+      <textarea #ta class="text" [value]="card().text" [disabled]="isViewer()" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
     } @else {
-      <div class="text readonly password-text" (click)="copyText()" (dblclick)="onTextDblClick($event)">{{ displayText }}
+      <div class="text readonly password-text" (click)="copyText()" (dblclick)="onTextDblClick($event)">{{ displayText() }}
         @if (copied()) {
           <span class="copied-overlay">Copied!</span>
         }
       </div>
     }
-  } @else if (card.card_type === 'image') {
-    @if (card.has_image) {
+  } @else if (card().card_type === 'image') {
+    @if (card().has_image) {
       <img class="img" [src]="imageUrl()" alt="" draggable="false" />
     }
-  } @else if (card.card_type === 'container') {
+  } @else if (card().card_type === 'container') {
     @if (editing()) {
-      <input #ta class="container-label-input" [value]="card.text" [disabled]="isViewer()"
+      <input #ta class="container-label-input" [value]="card().text" [disabled]="isViewer()"
         (blur)="commitEdit()" (keydown.escape)="commitEdit()" (keydown.enter)="commitEdit()"
         (pointerdown)="$event.stopPropagation()" />
     } @else {
-      <div class="container-label" (dblclick)="onTextDblClick($event)">{{ card.text || 'Container' }}</div>
+      <div class="container-label" (dblclick)="onTextDblClick($event)">{{ card().text || 'Container' }}</div>
     }
   } @else {
-    @if (card.is_secret) {
+    @if (card().is_secret) {
       @if (editingTitle()) {
-        <input #titleInput class="card-title-input" [value]="card.title"
+        <input #titleInput class="card-title-input" [value]="card().title"
           (blur)="commitTitleEdit()" (keydown.escape)="commitTitleEdit()" (keydown.enter)="commitTitleEdit()"
           (pointerdown)="$event.stopPropagation()" />
       } @else {
-        <div class="card-title" (dblclick)="onTitleDblClick($event)">{{ card.title || 'Untitled' }}</div>
+        <div class="card-title" (dblclick)="onTitleDblClick($event)">{{ card().title || 'Untitled' }}</div>
       }
     }
-    @if (card.is_secret && !revealed()) {
+    @if (card().is_secret && !revealed()) {
       <div class="secret-body" (click)="copyText()">
         <div class="text readonly masked">{{ maskedText() }}</div>
         @if (copied()) {
@@ -108,9 +108,9 @@
         }
       </div>
     } @else if (editing()) {
-      <textarea #ta class="text" [value]="card.text" [disabled]="isViewer()" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
+      <textarea #ta class="text" [value]="card().text" [disabled]="isViewer()" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
     } @else {
-      <div class="text readonly" (dblclick)="onTextDblClick($event)">{{ displayText }}</div>
+      <div class="text readonly" (dblclick)="onTextDblClick($event)">{{ displayText() }}</div>
     }
   }
 

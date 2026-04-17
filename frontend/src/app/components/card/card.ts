@@ -1,15 +1,15 @@
 import {
   Component,
   ElementRef,
-  EventEmitter,
-  Input,
-  Output,
-  ViewChild,
-  inject,
-  signal,
-  computed,
-  OnInit,
   OnDestroy,
+  OnInit,
+  ViewChild,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
 } from '@angular/core';
 import { ICard, CardService, CardPatch } from '../../core/api/card.service';
 import { CardTypeColorsService } from '../../core/api/card-type-colors.service';
@@ -31,19 +31,21 @@ export class CardComponent implements OnInit, OnDestroy {
   private colorsSvc = inject(CardTypeColorsService);
   private workspaces = inject(WorkspaceService);
 
-  @Input({ required: true }) card!: ICard;
-  @Input() highlighted = false;
-  @Input() isSelected = false;
-  @Input() scale = 1;
-  @Input() totpCode = '';
-  @Input() set revealToken(tok: { id: string; n: number } | null) {
-    if (tok && this.card && tok.id === this.card.id) this.revealed.set(true);
-  }
-  @Output() changed = new EventEmitter<ICard>();
-  @Output() deleted = new EventEmitter<string>();
-  @Output() dropped = new EventEmitter<ICard>();
-  @Output() moveStarted = new EventEmitter<string>();
-  @Output() contextRequested = new EventEmitter<{ card: ICard; x: number; y: number }>();
+  readonly cardIn = input.required<ICard>({ alias: 'card' });
+  readonly highlighted = input(false);
+  readonly isSelected = input(false);
+  readonly scale = input(1);
+  readonly totpCode = input('');
+  readonly revealToken = input<{ id: string; n: number } | null>(null);
+
+  readonly changed = output<ICard>();
+  readonly deleted = output<string>();
+  readonly dropped = output<ICard>();
+  readonly moveStarted = output<string>();
+  readonly contextRequested = output<{ card: ICard; x: number; y: number }>();
+
+  private readonly localCard = signal<ICard | null>(null);
+  readonly card = computed<ICard>(() => this.localCard() ?? this.cardIn());
 
   readonly editing = signal(false);
   readonly editingTitle = signal(false);
@@ -52,14 +54,28 @@ export class CardComponent implements OnInit, OnDestroy {
 
   readonly isViewer = computed(() => this.workspaces.active().role === 'viewer');
 
-  get displayText(): string {
-    const c = this.card;
+  readonly displayText = computed<string>(() => {
+    const c = this.card();
     if (!this.isViewer()) return c.text;
     if (c.card_type === 'password' || (c.card_type === 'note' && c.is_secret)) {
       return '••• hidden •••';
     }
     return c.text;
-  }
+  });
+
+  readonly isHidden = computed<boolean>(() => {
+    const c = this.card();
+    return c.card_type === 'totp' || c.card_type === 'password' || c.is_secret;
+  });
+
+  readonly cardBackground = computed<string>(() => {
+    const c = this.card();
+    if (c.card_type === 'container') {
+      return `color-mix(in srgb, ${c.color} 20%, transparent)`;
+    }
+    return this.colorsSvc.resolve(c);
+  });
+
   @ViewChild('ta') ta?: ElementRef<HTMLTextAreaElement>;
   @ViewChild('titleInput') titleInput?: ElementRef<HTMLInputElement>;
 
@@ -73,8 +89,16 @@ export class CardComponent implements OnInit, OnDestroy {
   private origW = 0;
   private origH = 0;
 
+  constructor() {
+    effect(() => {
+      const tok = this.revealToken();
+      if (tok && tok.id === this.cardIn().id) this.revealed.set(true);
+    });
+  }
+
   ngOnInit() {
-    if (this.card.is_secret && !this.card.text) {
+    const c = this.cardIn();
+    if (c.is_secret && !c.text) {
       this.revealed.set(true);
     }
   }
@@ -83,8 +107,8 @@ export class CardComponent implements OnInit, OnDestroy {
     if (this.copiedTimeout) clearTimeout(this.copiedTimeout);
   }
 
-  get isHidden(): boolean {
-    return this.card.card_type === 'totp' || this.card.card_type === 'password' || this.card.is_secret;
+  private setCard(next: ICard): void {
+    this.localCard.set(next);
   }
 
   toggleReveal() {
@@ -92,14 +116,16 @@ export class CardComponent implements OnInit, OnDestroy {
   }
 
   async toggleFavorite() {
-    const next = !this.card.is_favorite;
-    this.card = { ...this.card, is_favorite: next };
-    this.changed.emit(this.card);
+    const next = !this.card().is_favorite;
+    const updated = { ...this.card(), is_favorite: next };
+    this.setCard(updated);
+    this.changed.emit(updated);
     await this.persist({ is_favorite: next } as CardPatch);
   }
 
   async copyText() {
-    const text = this.card.card_type === 'totp' ? this.totpCode : this.card.text;
+    const c = this.card();
+    const text = c.card_type === 'totp' ? this.totpCode() : c.text;
     if (!text) return;
     await navigator.clipboard.writeText(text);
     this.copied.set(true);
@@ -108,7 +134,7 @@ export class CardComponent implements OnInit, OnDestroy {
   }
 
   maskedText(): string {
-    return this.card.text.replace(/./g, '\u2022');
+    return this.card().text.replace(/./g, '\u2022');
   }
 
   maskedTotp(): string {
@@ -116,7 +142,7 @@ export class CardComponent implements OnInit, OnDestroy {
   }
 
   formattedTotp(): string {
-    const code = this.totpCode;
+    const code = this.totpCode();
     if (code.length === 6) return code.slice(0, 3) + ' ' + code.slice(3);
     return code;
   }
@@ -125,14 +151,14 @@ export class CardComponent implements OnInit, OnDestroy {
     if (this.isViewer()) return;
     if (this.editing()) return;
     if (ev.ctrlKey || ev.metaKey) return;
-    this.moveStarted.emit(this.card.id);
+    this.moveStarted.emit(this.card().id);
     this.mode = 'move';
     this.startDrag(ev);
   }
 
   onResizePointerDown(ev: PointerEvent) {
     if (this.isViewer()) return;
-    this.moveStarted.emit(this.card.id);
+    this.moveStarted.emit(this.card().id);
     this.mode = 'resize';
     this.startDrag(ev);
     ev.stopPropagation();
@@ -141,36 +167,42 @@ export class CardComponent implements OnInit, OnDestroy {
   private startDrag(ev: PointerEvent) {
     ev.preventDefault();
     (ev.target as Element).setPointerCapture?.(ev.pointerId);
+    const c = this.card();
     this.startX = ev.clientX;
     this.startY = ev.clientY;
-    this.origX = this.card.x;
-    this.origY = this.card.y;
-    this.origW = this.card.width;
-    this.origH = this.card.height;
+    this.origX = c.x;
+    this.origY = c.y;
+    this.origW = c.width;
+    this.origH = c.height;
     window.addEventListener('pointermove', this.onMove);
     window.addEventListener('pointerup', this.onUp, { once: true });
   }
 
   private onMove = (ev: PointerEvent) => {
-    const dx = (ev.clientX - this.startX) / this.scale;
-    const dy = (ev.clientY - this.startY) / this.scale;
+    const scale = this.scale();
+    const dx = (ev.clientX - this.startX) / scale;
+    const dy = (ev.clientY - this.startY) / scale;
+    const c = this.card();
     if (this.mode === 'move') {
       let x = this.origX + dx;
       let y = this.origY + dy;
-      const snap = this.snapCtx.snapMove({ x, y, width: this.card.width, height: this.card.height });
+      const snap = this.snapCtx.snapMove({ x, y, width: c.width, height: c.height });
       if (snap) { x = snap.x; y = snap.y; }
-      this.card = { ...this.card, x, y };
+      const updated = { ...c, x, y };
+      this.setCard(updated);
+      this.changed.emit(updated);
     } else if (this.mode === 'resize') {
       let width = Math.max(120, this.origW + dx);
       let height = Math.max(90, this.origH + dy);
-      const snap = this.snapCtx.snapResize({ x: this.card.x, y: this.card.y, width, height });
+      const snap = this.snapCtx.snapResize({ x: c.x, y: c.y, width, height });
       if (snap) {
         width = Math.max(120, snap.width);
         height = Math.max(90, snap.height);
       }
-      this.card = { ...this.card, width, height };
+      const updated = { ...c, width, height };
+      this.setCard(updated);
+      this.changed.emit(updated);
     }
-    this.changed.emit(this.card);
   };
 
   private onUp = async () => {
@@ -178,19 +210,20 @@ export class CardComponent implements OnInit, OnDestroy {
     this.snapCtx.deactivate();
     const mode = this.mode;
     this.mode = null;
+    const c = this.card();
     if (mode === 'move') {
-      await this.persist({ x: this.card.x, y: this.card.y });
-      this.dropped.emit(this.card);
+      await this.persist({ x: c.x, y: c.y });
+      this.dropped.emit(c);
     } else if (mode === 'resize') {
-      await this.persist({ width: this.card.width, height: this.card.height });
+      await this.persist({ width: c.width, height: c.height });
     }
   };
 
   private async persist(body: CardPatch) {
     try {
-      const updated = await this.cards.patch(this.card.id, body);
-      this.card = updated;
-      this.changed.emit(this.card);
+      const updated = await this.cards.patch(this.card().id, body);
+      this.localCard.set(null);
+      this.changed.emit(updated);
     } catch (e) {
       console.error('patch failed', e);
     }
@@ -200,22 +233,22 @@ export class CardComponent implements OnInit, OnDestroy {
     ev.preventDefault();
     ev.stopPropagation();
     if (this.isViewer()) return;
-    this.contextRequested.emit({ card: this.card, x: ev.clientX, y: ev.clientY });
+    this.contextRequested.emit({ card: this.card(), x: ev.clientX, y: ev.clientY });
   }
 
   onTextDblClick(ev: MouseEvent) {
     if (this.isViewer()) return;
-    if (this.card.is_secret && !this.revealed()) return;
+    if (this.card().is_secret && !this.revealed()) return;
     ev.stopPropagation();
     this.editing.set(true);
     requestAnimationFrame(() => this.ta?.nativeElement.focus());
   }
 
   async commitEdit() {
-    const value = this.ta?.nativeElement.value ?? this.card.text;
+    const value = this.ta?.nativeElement.value ?? this.card().text;
     this.editing.set(false);
-    if (value === this.card.text) return;
-    this.card = { ...this.card, text: value };
+    if (value === this.card().text) return;
+    this.setCard({ ...this.card(), text: value });
     await this.persist({ text: value });
   }
 
@@ -227,21 +260,14 @@ export class CardComponent implements OnInit, OnDestroy {
   }
 
   async commitTitleEdit() {
-    const value = this.titleInput?.nativeElement.value ?? this.card.title;
+    const value = this.titleInput?.nativeElement.value ?? this.card().title;
     this.editingTitle.set(false);
-    if (value === this.card.title) return;
-    this.card = { ...this.card, title: value };
+    if (value === this.card().title) return;
+    this.setCard({ ...this.card(), title: value });
     await this.persist({ title: value });
   }
 
-  get cardBackground(): string {
-    if (this.card.card_type === 'container') {
-      return `color-mix(in srgb, ${this.card.color} 20%, transparent)`;
-    }
-    return this.colorsSvc.resolve(this.card);
-  }
-
   imageUrl(): string {
-    return this.cards.imageUrl(this.card.id, this.card.updated_at);
+    return this.cards.imageUrl(this.card().id, this.card().updated_at);
   }
 }
