@@ -12,7 +12,4 @@ require (
 	golang.org/x/oauth2 v0.36.0
 )
 
-require (
-	cloud.google.com/go/compute/metadata v0.3.0 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
-)
+require cloud.google.com/go/compute/metadata v0.3.0 // indirect
