@@ -56,7 +56,7 @@
     </div>
   } @else if (card.card_type === 'password') {
     @if (editingTitle()) {
-      <input #titleInput class="card-title-input" [value]="card.title"
+      <input #titleInput class="card-title-input" [value]="card.title" [disabled]="isViewer()"
         (blur)="commitTitleEdit()" (keydown.escape)="commitTitleEdit()" (keydown.enter)="commitTitleEdit()"
         (pointerdown)="$event.stopPropagation()" />
     } @else {
@@ -70,9 +70,9 @@
         }
       </div>
     } @else if (editing()) {
-      <textarea #ta class="text" [value]="card.text" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
+      <textarea #ta class="text" [value]="card.text" [disabled]="isViewer()" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
     } @else {
-      <div class="text readonly password-text" (click)="copyText()" (dblclick)="onTextDblClick($event)">{{ card.text }}
+      <div class="text readonly password-text" (click)="copyText()" (dblclick)="onTextDblClick($event)">{{ displayText() }}
         @if (copied()) {
           <span class="copied-overlay">Copied!</span>
         }
@@ -84,7 +84,7 @@
     }
   } @else if (card.card_type === 'container') {
     @if (editing()) {
-      <input #ta class="container-label-input" [value]="card.text"
+      <input #ta class="container-label-input" [value]="card.text" [disabled]="isViewer()"
         (blur)="commitEdit()" (keydown.escape)="commitEdit()" (keydown.enter)="commitEdit()"
         (pointerdown)="$event.stopPropagation()" />
     } @else {
@@ -108,9 +108,9 @@
         }
       </div>
     } @else if (editing()) {
-      <textarea #ta class="text" [value]="card.text" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
+      <textarea #ta class="text" [value]="card.text" [disabled]="isViewer()" (blur)="commitEdit()" (keydown.escape)="commitEdit()" (pointerdown)="$event.stopPropagation()"></textarea>
     } @else {
-      <div class="text readonly" (dblclick)="onTextDblClick($event)">{{ card.text }}</div>
+      <div class="text readonly" (dblclick)="onTextDblClick($event)">{{ displayText() }}</div>
     }
   }
 

@@ -7,11 +7,13 @@ import {
   ViewChild,
   inject,
   signal,
+  computed,
   OnInit,
   OnDestroy,
 } from '@angular/core';
 import { ICard, CardService, CardPatch } from '../../core/api/card.service';
 import { CardTypeColorsService } from '../../core/api/card-type-colors.service';
+import { WorkspaceService } from '../../core/workspace/workspace.service';
 import { SnapContext } from '../../core/snap';
 
 type DragMode = 'move' | 'resize' | null;
@@ -27,6 +29,7 @@ export class CardComponent implements OnInit, OnDestroy {
   private cards = inject(CardService);
   private snapCtx = inject(SnapContext);
   private colorsSvc = inject(CardTypeColorsService);
+  private workspaces = inject(WorkspaceService);
 
   @Input({ required: true }) card!: ICard;
   @Input() highlighted = false;
@@ -46,6 +49,17 @@ export class CardComponent implements OnInit, OnDestroy {
   readonly editingTitle = signal(false);
   readonly revealed = signal(false);
   readonly copied = signal(false);
+
+  readonly isViewer = computed(() => this.workspaces.active().role === 'viewer');
+
+  readonly displayText = computed(() => {
+    const c = this.card;
+    if (!this.isViewer()) return c.text;
+    if (c.card_type === 'password' || (c.card_type === 'note' && c.is_secret)) {
+      return '••• hidden •••';
+    }
+    return c.text;
+  });
   @ViewChild('ta') ta?: ElementRef<HTMLTextAreaElement>;
   @ViewChild('titleInput') titleInput?: ElementRef<HTMLInputElement>;
 
@@ -108,6 +122,7 @@ export class CardComponent implements OnInit, OnDestroy {
   }
 
   onHeaderPointerDown(ev: PointerEvent) {
+    if (this.isViewer()) return;
     if (this.editing()) return;
     if (ev.ctrlKey || ev.metaKey) return;
     this.moveStarted.emit(this.card.id);
@@ -116,6 +131,7 @@ export class CardComponent implements OnInit, OnDestroy {
   }
 
   onResizePointerDown(ev: PointerEvent) {
+    if (this.isViewer()) return;
     this.moveStarted.emit(this.card.id);
     this.mode = 'resize';
     this.startDrag(ev);
@@ -183,10 +199,12 @@ export class CardComponent implements OnInit, OnDestroy {
   onContextMenu(ev: MouseEvent) {
     ev.preventDefault();
     ev.stopPropagation();
+    if (this.isViewer()) return;
     this.contextRequested.emit({ card: this.card, x: ev.clientX, y: ev.clientY });
   }
 
   onTextDblClick(ev: MouseEvent) {
+    if (this.isViewer()) return;
     if (this.card.is_secret && !this.revealed()) return;
     ev.stopPropagation();
     this.editing.set(true);
@@ -202,6 +220,7 @@ export class CardComponent implements OnInit, OnDestroy {
   }
 
   onTitleDblClick(ev: MouseEvent) {
+    if (this.isViewer()) return;
     ev.stopPropagation();
     this.editingTitle.set(true);
     requestAnimationFrame(() => this.titleInput?.nativeElement.focus());
