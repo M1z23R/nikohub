@@ -56,7 +56,7 @@ func main() {
 	}
 	cardH := &cards.Handlers{Repo: cardRepo, Workspaces: wsRepo, Hub: hub, Log: nlog}
 	colorH := &cardtypecolors.Handlers{Repo: colorRepo, Log: nlog}
-	wsH := &workspaces.Handlers{Repo: wsRepo, Log: nlog}
+	wsH := &workspaces.Handlers{Repo: wsRepo, Hub: hub, Log: nlog}
 
 	app := drift.New()
 	app.Use(

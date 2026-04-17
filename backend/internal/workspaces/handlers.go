@@ -2,6 +2,7 @@ package workspaces
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 
 	nikologs "github.com/M1z23r/nikologs-go"
@@ -11,8 +12,13 @@ import (
 	"github.com/m1z23r/nikohub/internal/httpx"
 )
 
+type Broadcaster interface {
+	Broadcast(wsID uuid.UUID, editorPayload, viewerPayload []byte, skipUser *uuid.UUID)
+}
+
 type Handlers struct {
 	Repo *Repo
+	Hub  Broadcaster
 	Log  *nikologs.Client
 }
 
@@ -137,6 +143,10 @@ func (h *Handlers) Delete(c *drift.Context) {
 		return
 	}
 	c.Status(204)
+	if h.Hub != nil {
+		msg, _ := json.Marshal(map[string]any{"type": "workspace.deleted"})
+		h.Hub.Broadcast(id, msg, msg, nil)
+	}
 }
 
 type joinReq struct {
@@ -190,6 +200,13 @@ func (h *Handlers) Kick(c *drift.Context) {
 		return
 	}
 	c.Status(204)
+	if h.Hub != nil {
+		msg, _ := json.Marshal(map[string]any{
+			"type":   "member.kicked",
+			"userId": member.String(),
+		})
+		h.Hub.Broadcast(id, msg, msg, nil)
+	}
 }
 
 func (h *Handlers) Leave(c *drift.Context) {
