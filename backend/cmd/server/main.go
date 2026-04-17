@@ -100,7 +100,7 @@ func main() {
 	api.Delete("/workspaces/:id", auth.RequireAccess(secret), wsH.Delete)
 	api.Post("/workspaces/join", auth.RequireAccess(secret), wsH.Join)
 	api.Get("/workspaces/:id/members", auth.RequireAccess(secret), wsH.Members)
-	api.Post("/workspaces/:id/leave", auth.RequireAccess(secret), wsH.Leave)
+	api.Delete("/workspaces/:id/leave", auth.RequireAccess(secret), wsH.Leave)
 	api.Delete("/workspaces/:id/members/:userId", auth.RequireAccess(secret), wsH.Kick)
 	api.Get("/ws", realtime.SkipCompression(), auth.RequireAccessOrQueryToken(secret), rtH.Serve)
 

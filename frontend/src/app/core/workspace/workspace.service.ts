@@ -91,7 +91,7 @@ export class WorkspaceService {
   }
 
   async leave(id: string): Promise<void> {
-    await http.post(`${this.base}/${id}/leave`, {});
+    await http.delete(`${this.base}/${id}/leave`);
     this._list.update((l) => l.filter((w) => w.id !== id));
     if (this._activeId() === id) this._activeId.set(null);
   }
