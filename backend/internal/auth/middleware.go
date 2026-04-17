@@ -29,6 +29,29 @@ func RequireAccess(secret []byte) drift.HandlerFunc {
 	}
 }
 
+// RequireAccessOrQueryToken tries Bearer first, falls back to ?token=<access>.
+// Used for the WebSocket endpoint where the browser cannot set Authorization headers.
+func RequireAccessOrQueryToken(secret []byte) drift.HandlerFunc {
+	return func(c *drift.Context) {
+		if h := c.GetHeader("Authorization"); strings.HasPrefix(h, "Bearer ") {
+			raw := strings.TrimPrefix(h, "Bearer ")
+			if uid, err := ParseAccessToken(secret, raw); err == nil {
+				c.Set(CtxUserID, uid)
+				c.Next()
+				return
+			}
+		}
+		if raw := c.QueryParam("token"); raw != "" {
+			if uid, err := ParseAccessToken(secret, raw); err == nil {
+				c.Set(CtxUserID, uid)
+				c.Next()
+				return
+			}
+		}
+		httpx.Err(c, 401, "unauthorized")
+	}
+}
+
 // RequireAccessOrCookie tries Bearer first, falls back to refresh cookie.
 // Used for endpoints hit by browser directly (e.g. <img src>).
 func RequireAccessOrCookie(secret []byte, db *sql.DB) drift.HandlerFunc {
