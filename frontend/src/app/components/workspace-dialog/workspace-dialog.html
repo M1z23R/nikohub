@@ -1,0 +1,22 @@
+<div class="backdrop" (click)="dismiss()"></div>
+<div class="dialog" (click)="$event.stopPropagation()">
+  <h3>New workspace</h3>
+  <input placeholder="Workspace name"
+         [value]="name()"
+         (input)="name.set($any($event.target).value)"
+         (keydown.enter)="create()" />
+  <button (click)="create()" [disabled]="!name().trim() || busy()">Create</button>
+
+  <hr />
+
+  <h3>Or join</h3>
+  <input placeholder="Invite code"
+         [value]="code()"
+         (input)="code.set($any($event.target).value)"
+         (keydown.enter)="join()" />
+  <button (click)="join()" [disabled]="!code().trim() || busy()">Join</button>
+
+  @if (error()) { <div class="err">{{ error() }}</div> }
+
+  <button class="close" (click)="dismiss()">Close</button>
+</div>

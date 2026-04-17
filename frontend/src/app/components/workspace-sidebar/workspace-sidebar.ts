@@ -1,9 +1,11 @@
 import { Component, inject, signal } from '@angular/core';
 import { WorkspaceService, IWorkspace } from '../../core/workspace/workspace.service';
+import { WorkspaceDialog } from '../workspace-dialog/workspace-dialog';
 
 @Component({
   selector: 'app-workspace-sidebar',
   standalone: true,
+  imports: [WorkspaceDialog],
   templateUrl: './workspace-sidebar.html',
   styleUrl: './workspace-sidebar.css',
 })

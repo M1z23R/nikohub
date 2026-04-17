@@ -24,8 +24,5 @@
 </div>
 
 @if (dialogOpen()) {
-  <!-- WorkspaceDialog wired in Task 16 -->
-  <div class="ws-dialog-placeholder" (click)="dialogOpen.set(false)">
-    Dialog placeholder (Task 16) — click to close
-  </div>
+  <app-workspace-dialog (closed)="dialogOpen.set(false)" />
 }
