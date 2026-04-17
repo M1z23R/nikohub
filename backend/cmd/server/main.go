@@ -16,6 +16,7 @@ import (
 	"github.com/m1z23r/nikohub/internal/config"
 	"github.com/m1z23r/nikohub/internal/db"
 	"github.com/m1z23r/nikohub/internal/logx"
+	"github.com/m1z23r/nikohub/internal/realtime"
 	"github.com/m1z23r/nikohub/internal/users"
 	"github.com/m1z23r/nikohub/internal/workspaces"
 )
@@ -41,6 +42,10 @@ func main() {
 	cardRepo := cards.NewRepo(pg)
 	colorRepo := cardtypecolors.NewRepo(pg)
 	wsRepo := workspaces.NewRepo(pg)
+
+	hub := realtime.NewHub()
+	go hub.Run()
+	rtH := &realtime.Handlers{Hub: hub, Workspaces: wsRepo, Users: userRepo, Log: nlog}
 
 	authH := &auth.Handlers{
 		Cfg:   cfg,
@@ -97,6 +102,7 @@ func main() {
 	api.Get("/workspaces/:id/members", auth.RequireAccess(secret), wsH.Members)
 	api.Delete("/workspaces/:id/members/me", auth.RequireAccess(secret), wsH.Leave)
 	api.Delete("/workspaces/:id/members/:userId", auth.RequireAccess(secret), wsH.Kick)
+	api.Get("/ws", realtime.SkipCompression(), auth.RequireAccess(secret), rtH.Serve)
 
 	nlog.Info("server starting", nikologs.Fields{"port": cfg.Port})
 	if err := app.Run(":" + cfg.Port); err != nil {
