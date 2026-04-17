@@ -2,6 +2,7 @@ package cards
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"io"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"github.com/m1z23r/drift/pkg/drift"
 	"github.com/m1z23r/nikohub/internal/auth"
 	"github.com/m1z23r/nikohub/internal/httpx"
+	"github.com/m1z23r/nikohub/internal/realtime"
 	"github.com/m1z23r/nikohub/internal/workspaces"
 )
 
@@ -20,6 +22,7 @@ const MaxImageBytes = 5 * 1024 * 1024
 type Handlers struct {
 	Repo       *Repo
 	Workspaces *workspaces.Repo
+	Hub        *realtime.Hub
 	Log        *nikologs.Client
 }
 
@@ -96,6 +99,7 @@ func (h *Handlers) Create(c *drift.Context) {
 		return
 	}
 	c.JSON(201, RedactForRole(*card, role))
+	h.broadcastCard(card.WorkspaceID, "card.created", *card, uid)
 }
 
 type patchReq struct {
@@ -166,6 +170,7 @@ func (h *Handlers) Patch(c *drift.Context) {
 		return
 	}
 	c.JSON(200, RedactForRole(*card, role))
+	h.broadcastCard(card.WorkspaceID, "card.updated", *card, uid)
 }
 
 func (h *Handlers) Delete(c *drift.Context) {
@@ -175,7 +180,7 @@ func (h *Handlers) Delete(c *drift.Context) {
 		httpx.Err(c, 400, "bad id")
 		return
 	}
-	_, role, code, msg := h.authorizeCard(uid, id)
+	card, role, code, msg := h.authorizeCard(uid, id)
 	if code != 0 {
 		httpx.Err(c, code, msg)
 		return
@@ -192,6 +197,7 @@ func (h *Handlers) Delete(c *drift.Context) {
 		return
 	}
 	c.Status(204)
+	h.broadcastDelete(card.WorkspaceID, id, uid)
 }
 
 func (h *Handlers) UploadImage(c *drift.Context) {
@@ -246,6 +252,9 @@ func (h *Handlers) UploadImage(c *drift.Context) {
 		return
 	}
 	c.Status(204)
+	if updated, err := h.Repo.GetByID(id); err == nil {
+		h.broadcastCard(updated.WorkspaceID, "card.updated", *updated, uid)
+	}
 }
 
 func (h *Handlers) DeleteImage(c *drift.Context) {
@@ -272,6 +281,9 @@ func (h *Handlers) DeleteImage(c *drift.Context) {
 		return
 	}
 	c.Status(204)
+	if updated, err := h.Repo.GetByID(id); err == nil {
+		h.broadcastCard(updated.WorkspaceID, "card.updated", *updated, uid)
+	}
 }
 
 func (h *Handlers) GetImage(c *drift.Context) {
@@ -401,4 +413,33 @@ func (h *Handlers) authorizeCard(uid, cardID uuid.UUID) (*Card, string, int, str
 		return nil, "", 403, "forbidden"
 	}
 	return card, string(role), 0, ""
+}
+
+func (h *Handlers) broadcastCard(wsID *uuid.UUID, eventType string, card Card, actorID uuid.UUID) {
+	if wsID == nil || h.Hub == nil {
+		return
+	}
+	editorBytes, _ := json.Marshal(map[string]any{
+		"type": eventType,
+		"card": card,
+		"by":   actorID.String(),
+	})
+	viewerBytes, _ := json.Marshal(map[string]any{
+		"type": eventType,
+		"card": RedactForRole(card, "viewer"),
+		"by":   actorID.String(),
+	})
+	h.Hub.Broadcast(*wsID, editorBytes, viewerBytes, nil)
+}
+
+func (h *Handlers) broadcastDelete(wsID *uuid.UUID, cardID uuid.UUID, actorID uuid.UUID) {
+	if wsID == nil || h.Hub == nil {
+		return
+	}
+	msg, _ := json.Marshal(map[string]any{
+		"type": "card.deleted",
+		"id":   cardID.String(),
+		"by":   actorID.String(),
+	})
+	h.Hub.Broadcast(*wsID, msg, msg, nil)
 }

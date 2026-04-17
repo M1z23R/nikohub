@@ -54,7 +54,7 @@ func main() {
 		Users: userRepo,
 		Log:   nlog,
 	}
-	cardH := &cards.Handlers{Repo: cardRepo, Workspaces: wsRepo, Log: nlog}
+	cardH := &cards.Handlers{Repo: cardRepo, Workspaces: wsRepo, Hub: hub, Log: nlog}
 	colorH := &cardtypecolors.Handlers{Repo: colorRepo, Log: nlog}
 	wsH := &workspaces.Handlers{Repo: wsRepo, Log: nlog}
 
