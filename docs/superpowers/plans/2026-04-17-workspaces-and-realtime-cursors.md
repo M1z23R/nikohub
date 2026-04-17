@@ -6,7 +6,7 @@
 
 **Architecture:** Single-instance Go backend. New `workspaces` + `workspace_members` tables; `cards.workspace_id` nullable (NULL = owner's implicit personal space). All card mutations go through existing HTTP handlers; successful writes call `hub.Broadcast` after commit. Cursors travel only over the websocket. The hub is CSP-style: a single goroutine owns room state, all ops go through channels, no shared mutex. Frontend exposes a `WorkspaceService` signal store, a left sidebar, and a `RealtimeService` that reacts to active-workspace changes.
 
-**Tech Stack:** Go 1.25 + Drift framework + `gorilla/websocket` + PostgreSQL + Angular 21 signals + ngx-ui.
+**Tech Stack:** Go 1.25 + Drift framework (incl. `drift/pkg/websocket`) + PostgreSQL + Angular 21 signals + ngx-ui.
 
 ---
 
@@ -69,28 +69,9 @@ git commit -m "add workspaces + workspace_members tables, cards.workspace_id"
 
 ---
 
-### Task 2: Add gorilla/websocket dependency
+### Task 2: (REMOVED — drift's websocket package is used, no new dep needed)
 
-**Files:**
-- Modify: `backend/go.mod`
-- Modify: `backend/go.sum`
-
-- [ ] **Step 1: Add the dep**
-
-Run: `cd backend && go get github.com/gorilla/websocket@latest`
-Expected: `go.mod` now lists `github.com/gorilla/websocket`.
-
-- [ ] **Step 2: Tidy**
-
-Run: `cd backend && go mod tidy`
-Expected: `go.sum` updated.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add backend/go.mod backend/go.sum
-git commit -m "add gorilla/websocket dependency"
-```
+`github.com/m1z23r/drift/pkg/websocket` is already available via the existing drift dependency. Task numbers 3–24 below are unchanged.
 
 ---
 
@@ -1749,7 +1730,7 @@ git commit -m "realtime: CSP-style hub with race-tested broadcast/unregister/evi
 - Create: `backend/internal/realtime/handlers.go`
 - Modify: `backend/cmd/server/main.go`
 
-- [ ] **Step 1: Handler, upgrade, auth**
+- [ ] **Step 1: Handler, upgrade, auth (using `drift/pkg/websocket`)**
 
 `handlers.go`:
 
@@ -1763,8 +1744,9 @@ import (
 
 	nikologs "github.com/M1z23r/nikologs-go"
 	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 	"github.com/m1z23r/drift/pkg/drift"
+	"github.com/m1z23r/drift/pkg/middleware"
+	driftws "github.com/m1z23r/drift/pkg/websocket"
 	"github.com/m1z23r/nikohub/internal/auth"
 	"github.com/m1z23r/nikohub/internal/httpx"
 	"github.com/m1z23r/nikohub/internal/users"
@@ -1778,18 +1760,18 @@ type Handlers struct {
 	Log        *nikologs.Client
 }
 
-var upgrader = websocket.Upgrader{
+var upgrader = &driftws.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	ReadLimit:       1024,
 	CheckOrigin:     func(r *http.Request) bool { return true }, // CORS already gates
 }
 
-const (
-	writeWait    = 10 * time.Second
-	pongWait     = 60 * time.Second
-	pingPeriod   = (pongWait * 9) / 10
-	maxMsgBytes  = 1024
-)
+const writeWait = 10 * time.Second
+
+// Middleware returned from SkipCompression must be passed to the /ws route
+// alongside auth.RequireAccess when registering. Exported helper for main.go.
+func SkipCompression() drift.HandlerFunc { return middleware.SkipCompression() }
 
 func (h *Handlers) Serve(c *drift.Context) {
 	uid := auth.UserID(c)
@@ -1812,19 +1794,33 @@ func (h *Handlers) Serve(c *drift.Context) {
 		return
 	}
 
-	ws, err := upgrader.Upgrade(c.Response, c.Request, nil)
+	ws, err := upgrader.Upgrade(c)
 	if err != nil {
-		return // Upgrade writes its own response
+		return // Upgrade writes its own response on failure
 	}
 
-	conn := NewConn(uid, user.Name, string(role), wsID)
-	h.Hub.Register(conn)
+	rtConn := NewConn(uid, user.Name, string(role), wsID)
+	h.Hub.Register(rtConn)
+	h.announceJoin(rtConn)
 
-	go h.writePump(ws, conn)
-	go h.readPump(ws, conn)
+	defer func() {
+		h.Hub.Unregister(rtConn)
+		h.announceLeave(rtConn)
+		ws.Close(driftws.CloseNormalClosure, "bye")
+	}()
 
-	// Announce presence join to others, and send snapshot to this conn.
-	h.announceJoin(conn)
+	// Write pump in its own goroutine (drift's Conn has separate read/write mutexes).
+	writeDone := make(chan struct{})
+	go func() {
+		defer close(writeDone)
+		h.writePump(ws, rtConn)
+	}()
+
+	// Read pump runs in the handler goroutine; blocks until the client
+	// disconnects or sends a close frame.
+	h.readPump(ws, rtConn)
+
+	<-writeDone
 }
 ```
 
@@ -1833,30 +1829,16 @@ func (h *Handlers) Serve(c *drift.Context) {
 Append:
 
 ```go
-func (h *Handlers) writePump(ws *websocket.Conn, c *Conn) {
-	ticker := time.NewTicker(pingPeriod)
-	defer func() {
-		ticker.Stop()
-		ws.Close()
-	}()
-	for {
-		select {
-		case msg, ok := <-c.Send():
-			ws.SetWriteDeadline(time.Now().Add(writeWait))
-			if !ok {
-				ws.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-			if err := ws.WriteMessage(websocket.TextMessage, msg); err != nil {
-				return
-			}
-		case <-ticker.C:
-			ws.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := ws.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
-			}
+func (h *Handlers) writePump(ws *driftws.Conn, c *Conn) {
+	for msg := range c.Send() {
+		_ = ws.SetWriteDeadline(time.Now().Add(writeWait))
+		if err := ws.WriteMessage(driftws.TextMessage, msg); err != nil {
+			return
 		}
 	}
+	// send channel closed by the hub — close the socket cleanly.
+	_ = ws.SetWriteDeadline(time.Now().Add(writeWait))
+	_ = ws.Close(driftws.CloseNormalClosure, "")
 }
 
 type inboundMsg struct {
@@ -1865,18 +1847,7 @@ type inboundMsg struct {
 	Y    float64 `json:"y"`
 }
 
-func (h *Handlers) readPump(ws *websocket.Conn, c *Conn) {
-	defer func() {
-		h.Hub.Unregister(c)
-		h.announceLeave(c)
-		ws.Close()
-	}()
-	ws.SetReadLimit(maxMsgBytes)
-	ws.SetReadDeadline(time.Now().Add(pongWait))
-	ws.SetPongHandler(func(string) error {
-		ws.SetReadDeadline(time.Now().Add(pongWait))
-		return nil
-	})
+func (h *Handlers) readPump(ws *driftws.Conn, c *Conn) {
 	for {
 		_, data, err := ws.ReadMessage()
 		if err != nil {
@@ -1893,6 +1864,8 @@ func (h *Handlers) readPump(ws *websocket.Conn, c *Conn) {
 	}
 }
 ```
+
+**Keepalive notes:** drift's `Conn.ReadMessage` auto-responds to incoming pings (see `pkg/websocket/websocket.go` `case OpPing`), so clients that ping us get ponged for free. We don't send server-originated pings — idle connections rely on TCP keepalive and client-side reconnection logic to recover from dropped links. For v1 single-instance deployment this is acceptable; revisit if "phantom peers" become a UX issue.
 
 - [ ] **Step 3: Presence + cursor broadcasts**
 
@@ -1960,7 +1933,7 @@ hub := realtime.NewHub()
 go hub.Run()
 
 rtH := &realtime.Handlers{Hub: hub, Workspaces: wsRepo, Users: userRepo, Log: nlog}
-api.Get("/ws", auth.RequireAccess(secret), rtH.Serve)
+api.Get("/ws", realtime.SkipCompression(), auth.RequireAccess(secret), rtH.Serve)
 ```
 
 - [ ] **Step 6: Build + smoke**
