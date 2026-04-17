@@ -2,7 +2,40 @@
   "permissions": {
     "allow": [
       "Bash(npx ng *)",
-      "Bash(grep -r \"deploy\\\\|production\\\\|nginx\\\\|caddy\\\\|docker\" /home/dimitrije/projects/dimitrije/nikohub/*.md)"
+      "Bash(grep -r \"deploy\\\\|production\\\\|nginx\\\\|caddy\\\\|docker\" /home/dimitrije/projects/dimitrije/nikohub/*.md)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git checkout *)",
+      "Bash(go build *)",
+      "Bash(git commit *)",
+      "Bash(go get *)",
+      "Bash(go mod *)",
+      "Bash(echo \"---exit $?---\")",
+      "Bash(go test *)",
+      "Bash(git show *)",
+      "Bash(cat)",
+      "Bash(bash check_spec.sh)",
+      "Bash(sed -n '201,227p' old_cards.go)",
+      "Bash(sed -n '227,253p' new_cards.go)",
+      "Bash(sed -n '229,239p' old_cards.go)",
+      "Bash(sed -n '255,265p' new_cards.go)",
+      "Bash(sed -n '241,254p' old_cards.go)",
+      "Bash(sed -n '267,280p' new_cards.go)",
+      "Bash(sed -n '256,269p' old_cards.go)",
+      "Bash(sed -n '282,295p' new_cards.go)",
+      "Bash(sed -n '271,284p' old_cards.go)",
+      "Bash(sed -n '297,310p' new_cards.go)",
+      "Bash(sed -n '56,68p' old_cards.go)",
+      "Bash(sed -n '56,68p' new_cards.go)",
+      "Bash(sed -n '70,88p' old_cards.go)",
+      "Bash(sed -n '70,88p' new_cards.go)",
+      "Bash(sed -n '114,131p' old_cards.go)",
+      "Bash(sed -n '115,120p' new_cards.go)",
+      "Bash(go doc *)",
+      "Bash(go vet *)",
+      "Bash(git -C /home/dimitrije/projects/dimitrije/nikohub checkout feat/workspaces-realtime)",
+      "Bash(git -C /home/dimitrije/projects/dimitrije/nikohub checkout -b feat/workspaces-realtime)",
+      "Bash(npx tsc *)"
     ]
   }
 }
