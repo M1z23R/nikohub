@@ -25,7 +25,7 @@ type Handlers struct {
 
 func (h *Handlers) List(c *drift.Context) {
 	uid := auth.UserID(c)
-	wsID, role, code, msg := h.resolveScope(c, uid, c.QueryParam("workspace_id"))
+	wsID, role, code, msg := h.resolveScope(uid, c.QueryParam("workspace_id"))
 	if code != 0 {
 		httpx.Err(c, code, msg)
 		return
@@ -70,7 +70,7 @@ func (h *Handlers) Create(c *drift.Context) {
 	if in.WorkspaceID != nil {
 		wsRaw = *in.WorkspaceID
 	}
-	wsID, role, code, msg := h.resolveScope(c, uid, wsRaw)
+	wsID, role, code, msg := h.resolveScope(uid, wsRaw)
 	if code != 0 {
 		httpx.Err(c, code, msg)
 		return
@@ -304,7 +304,7 @@ func (h *Handlers) GetImage(c *drift.Context) {
 	c.Data(200, mime, data)
 }
 
-func (h *Handlers) resolveScope(c *drift.Context, uid uuid.UUID, raw string) (*uuid.UUID, string, int, string) {
+func (h *Handlers) resolveScope(uid uuid.UUID, raw string) (*uuid.UUID, string, int, string) {
 	if raw == "" || raw == "personal" {
 		return nil, "personal", 0, ""
 	}
