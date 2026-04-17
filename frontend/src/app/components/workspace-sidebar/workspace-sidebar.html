@@ -1,0 +1,31 @@
+<div class="ws-sidebar">
+  @for (w of list(); track w.id ?? 'personal') {
+    <div class="ws-row"
+         [class.active]="activeId() === w.id"
+         (click)="select(w)">
+      <span class="ws-name">{{ w.name }}</span>
+      @if (w.id) {
+        <button class="ws-menu-btn"
+                (click)="toggleMenu(w, $event)"
+                aria-label="Workspace actions">…</button>
+      }
+      @if (menuFor()?.id === w.id) {
+        <div class="ws-menu" (click)="$event.stopPropagation()">
+          @if (w.role === 'owner') {
+            <span class="ws-menu-placeholder">Owner menu (Task 17)</span>
+          } @else {
+            <button (click)="leave(w)">Leave</button>
+          }
+        </div>
+      }
+    </div>
+  }
+  <button class="ws-add" (click)="openDialog()">+</button>
+</div>
+
+@if (dialogOpen()) {
+  <!-- WorkspaceDialog wired in Task 16 -->
+  <div class="ws-dialog-placeholder" (click)="dialogOpen.set(false)">
+    Dialog placeholder (Task 16) — click to close
+  </div>
+}
