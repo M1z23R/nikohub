@@ -17,6 +17,7 @@ import (
 	"github.com/m1z23r/nikohub/internal/db"
 	"github.com/m1z23r/nikohub/internal/logx"
 	"github.com/m1z23r/nikohub/internal/users"
+	"github.com/m1z23r/nikohub/internal/workspaces"
 )
 
 func main() {
@@ -39,6 +40,7 @@ func main() {
 	userRepo := users.NewRepo(pg)
 	cardRepo := cards.NewRepo(pg)
 	colorRepo := cardtypecolors.NewRepo(pg)
+	wsRepo := workspaces.NewRepo(pg)
 
 	authH := &auth.Handlers{
 		Cfg:   cfg,
@@ -49,6 +51,7 @@ func main() {
 	}
 	cardH := &cards.Handlers{Repo: cardRepo, Log: nlog}
 	colorH := &cardtypecolors.Handlers{Repo: colorRepo, Log: nlog}
+	wsH := &workspaces.Handlers{Repo: wsRepo, Log: nlog}
 
 	app := drift.New()
 	app.Use(
@@ -86,6 +89,14 @@ func main() {
 	api.Get("/totps/:id", auth.RequireAccess(secret), cardH.GetTOTP)
 	api.Get("/card-type-colors", auth.RequireAccess(secret), colorH.List)
 	api.Patch("/card-type-colors/:cardType", auth.RequireAccess(secret), colorH.Patch)
+	api.Get("/workspaces", auth.RequireAccess(secret), wsH.List)
+	api.Post("/workspaces", auth.RequireAccess(secret), wsH.Create)
+	api.Patch("/workspaces/:id", auth.RequireAccess(secret), wsH.Patch)
+	api.Delete("/workspaces/:id", auth.RequireAccess(secret), wsH.Delete)
+	api.Post("/workspaces/join", auth.RequireAccess(secret), wsH.Join)
+	api.Get("/workspaces/:id/members", auth.RequireAccess(secret), wsH.Members)
+	api.Delete("/workspaces/:id/members/me", auth.RequireAccess(secret), wsH.Leave)
+	api.Delete("/workspaces/:id/members/:userId", auth.RequireAccess(secret), wsH.Kick)
 
 	nlog.Info("server starting", nikologs.Fields{"port": cfg.Port})
 	if err := app.Run(":" + cfg.Port); err != nil {
