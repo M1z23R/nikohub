@@ -2,6 +2,7 @@ package cards
 
 import (
 	"database/sql"
+	"errors"
 	"io"
 	"log"
 	"time"
@@ -11,37 +12,51 @@ import (
 	"github.com/m1z23r/drift/pkg/drift"
 	"github.com/m1z23r/nikohub/internal/auth"
 	"github.com/m1z23r/nikohub/internal/httpx"
+	"github.com/m1z23r/nikohub/internal/workspaces"
 )
 
 const MaxImageBytes = 5 * 1024 * 1024
 
 type Handlers struct {
-	Repo *Repo
-	Log  *nikologs.Client
+	Repo       *Repo
+	Workspaces *workspaces.Repo
+	Log        *nikologs.Client
 }
 
 func (h *Handlers) List(c *drift.Context) {
 	uid := auth.UserID(c)
-	list, err := h.Repo.List(uid)
+	wsID, role, code, msg := h.resolveScope(c, uid, c.QueryParam("workspace_id"))
+	if code != 0 {
+		httpx.Err(c, code, msg)
+		return
+	}
+	var list []Card
+	var err error
+	if wsID == nil {
+		list, err = h.Repo.ListPersonal(uid)
+	} else {
+		list, err = h.Repo.ListWorkspace(*wsID)
+	}
 	if err != nil {
 		httpx.Err(c, 500, "list failed")
 		return
 	}
-	c.JSON(200, list)
+	c.JSON(200, RedactList(list, role))
 }
 
 type createReq struct {
-	X          int    `json:"x"`
-	Y          int    `json:"y"`
-	Width      int    `json:"width"`
-	Height     int    `json:"height"`
-	Color      string `json:"color"`
-	Text       string `json:"text"`
-	Title      string `json:"title"`
-	CardType   string `json:"card_type"`
-	IsSecret   bool   `json:"is_secret"`
-	TotpSecret string `json:"totp_secret,omitempty"`
-	TotpName   string `json:"totp_name,omitempty"`
+	X           int     `json:"x"`
+	Y           int     `json:"y"`
+	Width       int     `json:"width"`
+	Height      int     `json:"height"`
+	Color       string  `json:"color"`
+	Text        string  `json:"text"`
+	Title       string  `json:"title"`
+	CardType    string  `json:"card_type"`
+	IsSecret    bool    `json:"is_secret"`
+	TotpSecret  string  `json:"totp_secret,omitempty"`
+	TotpName    string  `json:"totp_name,omitempty"`
+	WorkspaceID *string `json:"workspace_id,omitempty"`
 }
 
 func (h *Handlers) Create(c *drift.Context) {
@@ -51,21 +66,36 @@ func (h *Handlers) Create(c *drift.Context) {
 		httpx.Err(c, 400, "bad json")
 		return
 	}
+	wsRaw := ""
+	if in.WorkspaceID != nil {
+		wsRaw = *in.WorkspaceID
+	}
+	wsID, role, code, msg := h.resolveScope(c, uid, wsRaw)
+	if code != 0 {
+		httpx.Err(c, code, msg)
+		return
+	}
+	if wsID != nil && role == string(workspaces.RoleViewer) {
+		httpx.Err(c, 403, "viewers cannot create")
+		return
+	}
 	if in.CardType == "totp" && in.TotpSecret == "" {
 		httpx.Err(c, 400, "totp_secret required for totp card")
 		return
 	}
 	card, err := h.Repo.Create(uid, CreateInput{
+		WorkspaceID: wsID,
 		X: in.X, Y: in.Y, Width: in.Width, Height: in.Height,
 		Color: in.Color, Text: in.Text, Title: in.Title,
-		CardType: in.CardType, IsSecret: in.IsSecret, TotpSecret: in.TotpSecret, TotpName: in.TotpName,
+		CardType: in.CardType, IsSecret: in.IsSecret,
+		TotpSecret: in.TotpSecret, TotpName: in.TotpName,
 	})
 	if err != nil {
 		log.Printf("CREATE CARD ERROR: %v", err)
 		httpx.Err(c, 500, "create failed")
 		return
 	}
-	c.JSON(201, card)
+	c.JSON(201, RedactForRole(*card, role))
 }
 
 type patchReq struct {
@@ -272,4 +302,22 @@ func (h *Handlers) GetImage(c *drift.Context) {
 	}
 	c.Response.Header().Set("Cache-Control", "private, max-age=3600")
 	c.Data(200, mime, data)
+}
+
+func (h *Handlers) resolveScope(c *drift.Context, uid uuid.UUID, raw string) (*uuid.UUID, string, int, string) {
+	if raw == "" || raw == "personal" {
+		return nil, "personal", 0, ""
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return nil, "", 400, "bad workspace id"
+	}
+	role, err := h.Workspaces.AuthorizeWorkspace(uid, id)
+	if err != nil {
+		if errors.Is(err, workspaces.ErrForbidden) || errors.Is(err, workspaces.ErrNotFound) {
+			return nil, "", 403, "forbidden"
+		}
+		return nil, "", 500, "authz error"
+	}
+	return &id, string(role), 0, ""
 }
