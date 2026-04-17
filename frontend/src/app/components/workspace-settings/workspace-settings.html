@@ -1,0 +1,61 @@
+<div class="backdrop" (click)="closed.emit()"></div>
+<div class="panel" (click)="$event.stopPropagation()">
+  <div class="tabs">
+    <button (click)="open('rename')" [class.active]="pane() === 'rename'">Rename</button>
+    <button (click)="open('codes')" [class.active]="pane() === 'codes'">Invite codes</button>
+    <button (click)="open('members')" [class.active]="pane() === 'members'">Members</button>
+    <button (click)="open('delete')" [class.active]="pane() === 'delete'">Delete</button>
+  </div>
+
+  @if (pane() === 'rename') {
+    <input [value]="renameValue()"
+           (input)="renameValue.set($any($event.target).value)"
+           (keydown.enter)="rename()" />
+    <button (click)="rename()" [disabled]="!renameValue().trim() || busy()">Save</button>
+  }
+
+  @if (pane() === 'codes') {
+    <div class="code-row">
+      <span>Viewer:</span>
+      <code>{{ workspace().viewer_code ?? '(disabled)' }}</code>
+      @if (workspace().viewer_code) {
+        <button (click)="copy(workspace().viewer_code!)">Copy</button>
+      }
+      <button (click)="rotate('viewer')">Regenerate</button>
+      <button (click)="disable('viewer')">Disable</button>
+    </div>
+    <div class="code-row">
+      <span>Editor:</span>
+      <code>{{ workspace().editor_code ?? '(disabled)' }}</code>
+      @if (workspace().editor_code) {
+        <button (click)="copy(workspace().editor_code!)">Copy</button>
+      }
+      <button (click)="rotate('editor')">Regenerate</button>
+      <button (click)="disable('editor')">Disable</button>
+    </div>
+  }
+
+  @if (pane() === 'members') {
+    @if (members(); as list) {
+      @if (!list.length) { <div>No members yet.</div> }
+      @for (m of list; track m.user_id) {
+        <div class="member-row">
+          <span>{{ m.name }} ({{ m.role }})</span>
+          <button (click)="kick(m.user_id)">Kick</button>
+        </div>
+      }
+    } @else {
+      <div>Loading…</div>
+    }
+  }
+
+  @if (pane() === 'delete') {
+    <div>Type <b>{{ workspace().name }}</b> to confirm deletion:</div>
+    <input [value]="confirmName()"
+           (input)="confirmName.set($any($event.target).value)" />
+    @if (error()) { <div class="err">{{ error() }}</div> }
+    <button class="danger" (click)="remove()" [disabled]="busy()">Delete workspace</button>
+  }
+
+  <button class="close" (click)="closed.emit()">Close</button>
+</div>

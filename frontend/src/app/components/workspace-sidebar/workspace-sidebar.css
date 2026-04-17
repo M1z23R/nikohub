@@ -53,11 +53,6 @@
   border-radius: 4px;
 }
 .ws-menu button:hover { background: #f4f4f5; }
-.ws-menu-placeholder {
-  color: #a1a1aa;
-  font-size: 12px;
-  padding: 4px 8px;
-}
 .ws-add {
   padding: 6px 10px;
   background: #a7f3d0;

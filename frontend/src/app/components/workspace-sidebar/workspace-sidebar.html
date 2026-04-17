@@ -12,7 +12,7 @@
       @if (menuFor()?.id === w.id) {
         <div class="ws-menu" (click)="$event.stopPropagation()">
           @if (w.role === 'owner') {
-            <span class="ws-menu-placeholder">Owner menu (Task 17)</span>
+            <button (click)="openSettings(w)">Settings</button>
           } @else {
             <button (click)="leave(w)">Leave</button>
           }
@@ -25,4 +25,8 @@
 
 @if (dialogOpen()) {
   <app-workspace-dialog (closed)="dialogOpen.set(false)" />
+}
+
+@if (settingsFor(); as w) {
+  <app-workspace-settings [workspace]="w" (closed)="settingsFor.set(null)" />
 }
