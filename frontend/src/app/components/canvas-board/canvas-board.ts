@@ -5,6 +5,7 @@ import { ICard, CardService } from '../../core/api/card.service';
 import { CardTypeColorsService } from '../../core/api/card-type-colors.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 import { SnapContext, ISnapLine } from '../../core/snap';
+import { RealtimeService, CardEvent } from '../../core/realtime/realtime.service';
 
 export interface EdgeIndicator {
   x: number;
@@ -33,6 +34,7 @@ export class CanvasBoardComponent {
   private snapCtx = inject(SnapContext);
   private colorsSvc = inject(CardTypeColorsService);
   private workspaces = inject(WorkspaceService);
+  private realtime = inject(RealtimeService);
   readonly colors = COLORS;
   readonly list = signal<ICard[]>([]);
   readonly menu = signal<Menu>(null);
@@ -161,15 +163,24 @@ export class CanvasBoardComponent {
       const view = { panX: this.panX(), panY: this.panY(), scale: this.scale() };
       localStorage.setItem(CanvasBoardComponent.VIEW_STORAGE_KEY, JSON.stringify(view));
     });
+
+    effect(async () => {
+      const wsId = this.workspaces.active().id;
+      await this.reloadForScope(wsId);
+      this.realtime.connect(wsId);
+    });
+
+    this.realtime.onCardEvent((ev) => this.applyRemoteCardEvent(ev));
+    this.realtime.onWorkspaceEvent((_kind) => {
+      this.workspaces.setActive(null);
+    });
   }
 
   async ngOnInit() {
-    const [cards] = await Promise.all([this.cards.list(this.workspaces.active().id), this.colorsSvc.load()]);
-    this.list.set(cards);
+    await this.colorsSvc.load();
     this.updateBoardSize();
     this.resizeObs = new ResizeObserver(() => this.updateBoardSize());
     this.resizeObs.observe(this.board.nativeElement);
-    await this.fetchAllTotp();
     this.totpTimer = setInterval(() => this.tickTotp(), 1000);
   }
 
@@ -177,6 +188,23 @@ export class CanvasBoardComponent {
     this.resizeObs?.disconnect();
     if (this.totpTimer) clearInterval(this.totpTimer);
     if (this.copiedFavTimeout) clearTimeout(this.copiedFavTimeout);
+    this.realtime.disconnect();
+  }
+
+  private async reloadForScope(wsId: string | null): Promise<void> {
+    const list = await this.cards.list(wsId);
+    this.list.set(list);
+    await this.fetchAllTotp();
+  }
+
+  private applyRemoteCardEvent(ev: CardEvent): void {
+    if (ev.type === 'card.created') {
+      this.list.update((l) => (l.some((c) => c.id === ev.card.id) ? l : [...l, ev.card]));
+    } else if (ev.type === 'card.updated') {
+      this.list.update((l) => l.map((c) => (c.id === ev.card.id ? ev.card : c)));
+    } else if (ev.type === 'card.deleted') {
+      this.list.update((l) => l.filter((c) => c.id !== ev.id));
+    }
   }
 
   private async fetchAllTotp() {
