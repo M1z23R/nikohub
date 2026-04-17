@@ -53,10 +53,10 @@ func GenerateTOTP(secret string, t time.Time) (string, error) {
 	return fmt.Sprintf("%06d", code%1000000), nil
 }
 
-func (r *Repo) GetSecret(userID, id uuid.UUID) (string, error) {
+func (r *Repo) GetSecret(id uuid.UUID) (string, error) {
 	var secret sql.NullString
 	err := r.db.QueryRow(
-		`SELECT totp_secret FROM cards WHERE id=$1 AND user_id=$2 AND card_type='totp'`, id, userID,
+		`SELECT totp_secret FROM cards WHERE id=$1 AND card_type='totp'`, id,
 	).Scan(&secret)
 	if err != nil {
 		return "", err
@@ -65,26 +65,6 @@ func (r *Repo) GetSecret(userID, id uuid.UUID) (string, error) {
 		return "", sql.ErrNoRows
 	}
 	return secret.String, nil
-}
-
-func (r *Repo) GetAllSecrets(userID uuid.UUID) (map[uuid.UUID]string, error) {
-	rows, err := r.db.Query(
-		`SELECT id, totp_secret FROM cards WHERE user_id=$1 AND card_type='totp' AND totp_secret IS NOT NULL`, userID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := make(map[uuid.UUID]string)
-	for rows.Next() {
-		var id uuid.UUID
-		var secret string
-		if err := rows.Scan(&id, &secret); err != nil {
-			return nil, err
-		}
-		out[id] = secret
-	}
-	return out, rows.Err()
 }
 
 type Card struct {
@@ -111,13 +91,6 @@ type Card struct {
 type Repo struct{ db *sql.DB }
 
 func NewRepo(db *sql.DB) *Repo { return &Repo{db: db} }
-
-func (r *Repo) List(userID uuid.UUID) ([]Card, error) {
-	rows, err := r.db.Query(`
-		SELECT `+returnCols+`
-		FROM cards WHERE user_id=$1 ORDER BY z_index ASC, created_at ASC`, userID)
-	return r.scanList(rows, err)
-}
 
 func (r *Repo) ListPersonal(userID uuid.UUID) ([]Card, error) {
 	rows, err := r.db.Query(`
@@ -224,26 +197,26 @@ type UpdateInput struct {
 	ClearContainerID            bool
 }
 
-func (r *Repo) Update(userID, id uuid.UUID, in UpdateInput) (*Card, error) {
+func (r *Repo) Update(id uuid.UUID, in UpdateInput) (*Card, error) {
 	c := &Card{}
 	row := r.db.QueryRow(`
 		UPDATE cards SET
-		  x = COALESCE($3,x),
-		  y = COALESCE($4,y),
-		  width = COALESCE($5,width),
-		  height = COALESCE($6,height),
-		  z_index = COALESCE($7,z_index),
-		  color = COALESCE($8,color),
-		  text = COALESCE($9,text),
-		  title = COALESCE($10,title),
-		  is_secret = COALESCE($11,is_secret),
-		  is_favorite = COALESCE($14,is_favorite),
-		  sidebar_order = COALESCE($15,sidebar_order),
-		  container_id = CASE WHEN $13 THEN NULL WHEN $12::uuid IS NOT NULL THEN $12::uuid ELSE container_id END,
+		  x = COALESCE($2,x),
+		  y = COALESCE($3,y),
+		  width = COALESCE($4,width),
+		  height = COALESCE($5,height),
+		  z_index = COALESCE($6,z_index),
+		  color = COALESCE($7,color),
+		  text = COALESCE($8,text),
+		  title = COALESCE($9,title),
+		  is_secret = COALESCE($10,is_secret),
+		  is_favorite = COALESCE($13,is_favorite),
+		  sidebar_order = COALESCE($14,sidebar_order),
+		  container_id = CASE WHEN $12 THEN NULL WHEN $11::uuid IS NOT NULL THEN $11::uuid ELSE container_id END,
 		  updated_at = now()
-		WHERE id=$1 AND user_id=$2
+		WHERE id=$1
 		RETURNING `+returnCols,
-		id, userID, in.X, in.Y, in.Width, in.Height, in.ZIndex, in.Color, in.Text, in.Title, in.IsSecret,
+		id, in.X, in.Y, in.Width, in.Height, in.ZIndex, in.Color, in.Text, in.Title, in.IsSecret,
 		in.ContainerID, in.ClearContainerID, in.IsFavorite, in.SidebarOrder,
 	)
 	if err := scanCard(row, c); err != nil {
@@ -252,8 +225,8 @@ func (r *Repo) Update(userID, id uuid.UUID, in UpdateInput) (*Card, error) {
 	return c, nil
 }
 
-func (r *Repo) Delete(userID, id uuid.UUID) error {
-	res, err := r.db.Exec(`DELETE FROM cards WHERE id=$1 AND user_id=$2`, id, userID)
+func (r *Repo) Delete(id uuid.UUID) error {
+	res, err := r.db.Exec(`DELETE FROM cards WHERE id=$1`, id)
 	if err != nil {
 		return err
 	}
@@ -264,10 +237,10 @@ func (r *Repo) Delete(userID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repo) SetImage(userID, id uuid.UUID, mime string, data []byte) error {
+func (r *Repo) SetImage(id uuid.UUID, mime string, data []byte) error {
 	res, err := r.db.Exec(
-		`UPDATE cards SET image_mime=$3, image_data=$4, updated_at=now() WHERE id=$1 AND user_id=$2`,
-		id, userID, mime, data,
+		`UPDATE cards SET image_mime=$2, image_data=$3, updated_at=now() WHERE id=$1`,
+		id, mime, data,
 	)
 	if err != nil {
 		return err
@@ -279,10 +252,10 @@ func (r *Repo) SetImage(userID, id uuid.UUID, mime string, data []byte) error {
 	return nil
 }
 
-func (r *Repo) ClearImage(userID, id uuid.UUID) error {
+func (r *Repo) ClearImage(id uuid.UUID) error {
 	res, err := r.db.Exec(
-		`UPDATE cards SET image_mime=NULL, image_data=NULL, updated_at=now() WHERE id=$1 AND user_id=$2`,
-		id, userID,
+		`UPDATE cards SET image_mime=NULL, image_data=NULL, updated_at=now() WHERE id=$1`,
+		id,
 	)
 	if err != nil {
 		return err
@@ -294,11 +267,11 @@ func (r *Repo) ClearImage(userID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repo) GetImage(userID, id uuid.UUID) (string, []byte, error) {
+func (r *Repo) GetImage(id uuid.UUID) (string, []byte, error) {
 	var mime sql.NullString
 	var data []byte
 	err := r.db.QueryRow(
-		`SELECT image_mime, image_data FROM cards WHERE id=$1 AND user_id=$2`, id, userID,
+		`SELECT image_mime, image_data FROM cards WHERE id=$1`, id,
 	).Scan(&mime, &data)
 	if err != nil {
 		return "", nil, err

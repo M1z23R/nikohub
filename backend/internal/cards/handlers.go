@@ -99,14 +99,14 @@ func (h *Handlers) Create(c *drift.Context) {
 }
 
 type patchReq struct {
-	X           *int    `json:"x,omitempty"`
-	Y           *int    `json:"y,omitempty"`
-	Width       *int    `json:"width,omitempty"`
-	Height      *int    `json:"height,omitempty"`
-	ZIndex      *int    `json:"z_index,omitempty"`
-	Color       *string `json:"color,omitempty"`
-	Text        *string `json:"text,omitempty"`
-	Title       *string `json:"title,omitempty"`
+	X            *int    `json:"x,omitempty"`
+	Y            *int    `json:"y,omitempty"`
+	Width        *int    `json:"width,omitempty"`
+	Height       *int    `json:"height,omitempty"`
+	ZIndex       *int    `json:"z_index,omitempty"`
+	Color        *string `json:"color,omitempty"`
+	Text         *string `json:"text,omitempty"`
+	Title        *string `json:"title,omitempty"`
 	IsSecret     *bool   `json:"is_secret,omitempty"`
 	IsFavorite   *bool   `json:"is_favorite,omitempty"`
 	SidebarOrder *int    `json:"sidebar_order,omitempty"`
@@ -118,6 +118,15 @@ func (h *Handlers) Patch(c *drift.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		httpx.Err(c, 400, "bad id")
+		return
+	}
+	_, role, code, msg := h.authorizeCard(uid, id)
+	if code != 0 {
+		httpx.Err(c, code, msg)
+		return
+	}
+	if role == string(workspaces.RoleViewer) {
+		httpx.Err(c, 403, "viewers cannot edit")
 		return
 	}
 	var in patchReq
@@ -141,7 +150,7 @@ func (h *Handlers) Patch(c *drift.Context) {
 		}
 	}
 
-	card, err := h.Repo.Update(uid, id, UpdateInput{
+	card, err := h.Repo.Update(id, UpdateInput{
 		X: in.X, Y: in.Y, Width: in.Width, Height: in.Height, ZIndex: in.ZIndex,
 		SidebarOrder: in.SidebarOrder,
 		Color: in.Color, Text: in.Text, Title: in.Title, IsSecret: in.IsSecret, IsFavorite: in.IsFavorite,
@@ -156,7 +165,7 @@ func (h *Handlers) Patch(c *drift.Context) {
 		httpx.Err(c, 500, "update failed")
 		return
 	}
-	c.JSON(200, card)
+	c.JSON(200, RedactForRole(*card, role))
 }
 
 func (h *Handlers) Delete(c *drift.Context) {
@@ -166,7 +175,16 @@ func (h *Handlers) Delete(c *drift.Context) {
 		httpx.Err(c, 400, "bad id")
 		return
 	}
-	if err := h.Repo.Delete(uid, id); err == sql.ErrNoRows {
+	_, role, code, msg := h.authorizeCard(uid, id)
+	if code != 0 {
+		httpx.Err(c, code, msg)
+		return
+	}
+	if role == string(workspaces.RoleViewer) {
+		httpx.Err(c, 403, "viewers cannot delete")
+		return
+	}
+	if err := h.Repo.Delete(id); err == sql.ErrNoRows {
 		httpx.Err(c, 404, "not found")
 		return
 	} else if err != nil {
@@ -181,6 +199,15 @@ func (h *Handlers) UploadImage(c *drift.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		httpx.Err(c, 400, "bad id")
+		return
+	}
+	_, role, code, msg := h.authorizeCard(uid, id)
+	if code != 0 {
+		httpx.Err(c, code, msg)
+		return
+	}
+	if role == string(workspaces.RoleViewer) {
+		httpx.Err(c, 403, "viewers cannot upload")
 		return
 	}
 	fh, err := c.FormFile("file")
@@ -211,7 +238,7 @@ func (h *Handlers) UploadImage(c *drift.Context) {
 	if mime == "" {
 		mime = "application/octet-stream"
 	}
-	if err := h.Repo.SetImage(uid, id, mime, data); err == sql.ErrNoRows {
+	if err := h.Repo.SetImage(id, mime, data); err == sql.ErrNoRows {
 		httpx.Err(c, 404, "not found")
 		return
 	} else if err != nil {
@@ -228,7 +255,16 @@ func (h *Handlers) DeleteImage(c *drift.Context) {
 		httpx.Err(c, 400, "bad id")
 		return
 	}
-	if err := h.Repo.ClearImage(uid, id); err == sql.ErrNoRows {
+	_, role, code, msg := h.authorizeCard(uid, id)
+	if code != 0 {
+		httpx.Err(c, code, msg)
+		return
+	}
+	if role == string(workspaces.RoleViewer) {
+		httpx.Err(c, 403, "viewers cannot delete image")
+		return
+	}
+	if err := h.Repo.ClearImage(id); err == sql.ErrNoRows {
 		httpx.Err(c, 404, "not found")
 		return
 	} else if err != nil {
@@ -238,52 +274,6 @@ func (h *Handlers) DeleteImage(c *drift.Context) {
 	c.Status(204)
 }
 
-func (h *Handlers) GetAllTOTP(c *drift.Context) {
-	uid := auth.UserID(c)
-	secrets, err := h.Repo.GetAllSecrets(uid)
-	if err != nil {
-		httpx.Err(c, 500, "read failed")
-		return
-	}
-	now := time.Now()
-	codes := make(map[string]TotpBatchEntry, len(secrets))
-	for id, secret := range secrets {
-		code, err := GenerateTOTP(secret, now)
-		if err != nil {
-			continue
-		}
-		codes[id.String()] = TotpBatchEntry{Code: code}
-	}
-	remaining := 30 - int(now.Unix()%30)
-	c.JSON(200, TotpBatchResponse{Codes: codes, Remaining: remaining, Period: 30})
-}
-
-func (h *Handlers) GetTOTP(c *drift.Context) {
-	uid := auth.UserID(c)
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		httpx.Err(c, 400, "bad id")
-		return
-	}
-	secret, err := h.Repo.GetSecret(uid, id)
-	if err == sql.ErrNoRows {
-		httpx.Err(c, 404, "not found")
-		return
-	}
-	if err != nil {
-		httpx.Err(c, 500, "read failed")
-		return
-	}
-	now := time.Now()
-	code, err := GenerateTOTP(secret, now)
-	if err != nil {
-		httpx.Err(c, 500, "totp generation failed")
-		return
-	}
-	remaining := 30 - int(now.Unix()%30)
-	c.JSON(200, TotpCode{Code: code, Remaining: remaining, Period: 30})
-}
-
 func (h *Handlers) GetImage(c *drift.Context) {
 	uid := auth.UserID(c)
 	id, err := uuid.Parse(c.Param("id"))
@@ -291,7 +281,12 @@ func (h *Handlers) GetImage(c *drift.Context) {
 		httpx.Err(c, 400, "bad id")
 		return
 	}
-	mime, data, err := h.Repo.GetImage(uid, id)
+	_, _, code, msg := h.authorizeCard(uid, id)
+	if code != 0 {
+		httpx.Err(c, code, msg)
+		return
+	}
+	mime, data, err := h.Repo.GetImage(id)
 	if err == sql.ErrNoRows {
 		httpx.Err(c, 404, "not found")
 		return
@@ -302,6 +297,70 @@ func (h *Handlers) GetImage(c *drift.Context) {
 	}
 	c.Response.Header().Set("Cache-Control", "private, max-age=3600")
 	c.Data(200, mime, data)
+}
+
+func (h *Handlers) GetTOTP(c *drift.Context) {
+	uid := auth.UserID(c)
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		httpx.Err(c, 400, "bad id")
+		return
+	}
+	_, role, code, msg := h.authorizeCard(uid, id)
+	if code != 0 {
+		httpx.Err(c, code, msg)
+		return
+	}
+	if role == string(workspaces.RoleViewer) {
+		httpx.Err(c, 403, "viewers cannot read totp")
+		return
+	}
+	secret, err := h.Repo.GetSecret(id)
+	if err == sql.ErrNoRows {
+		httpx.Err(c, 404, "not found")
+		return
+	}
+	if err != nil {
+		httpx.Err(c, 500, "read failed")
+		return
+	}
+	now := time.Now()
+	code2, err := GenerateTOTP(secret, now)
+	if err != nil {
+		httpx.Err(c, 500, "totp generation failed")
+		return
+	}
+	remaining := 30 - int(now.Unix()%30)
+	c.JSON(200, TotpCode{Code: code2, Remaining: remaining, Period: 30})
+}
+
+func (h *Handlers) GetAllTOTP(c *drift.Context) {
+	uid := auth.UserID(c)
+	wsID, role, code, msg := h.resolveScope(uid, c.QueryParam("workspace_id"))
+	if code != 0 {
+		httpx.Err(c, code, msg)
+		return
+	}
+	if role == string(workspaces.RoleViewer) {
+		httpx.Err(c, 403, "viewers cannot read totp")
+		return
+	}
+	secrets, err := h.Repo.GetAllSecretsForScope(uid, wsID)
+	if err != nil {
+		httpx.Err(c, 500, "read failed")
+		return
+	}
+	now := time.Now()
+	codes := make(map[string]TotpBatchEntry, len(secrets))
+	for id, secret := range secrets {
+		generated, err := GenerateTOTP(secret, now)
+		if err != nil {
+			continue
+		}
+		codes[id.String()] = TotpBatchEntry{Code: generated}
+	}
+	remaining := 30 - int(now.Unix()%30)
+	c.JSON(200, TotpBatchResponse{Codes: codes, Remaining: remaining, Period: 30})
 }
 
 func (h *Handlers) resolveScope(uid uuid.UUID, raw string) (*uuid.UUID, string, int, string) {
@@ -320,4 +379,26 @@ func (h *Handlers) resolveScope(uid uuid.UUID, raw string) (*uuid.UUID, string, 
 		return nil, "", 500, "authz error"
 	}
 	return &id, string(role), 0, ""
+}
+
+func (h *Handlers) authorizeCard(uid, cardID uuid.UUID) (*Card, string, int, string) {
+	card, err := h.Repo.GetByID(cardID)
+	if err == sql.ErrNoRows {
+		return nil, "", 404, "not found"
+	}
+	if err != nil {
+		return nil, "", 500, "lookup failed"
+	}
+	if card.WorkspaceID == nil {
+		ownerID, err := h.Repo.OwnerOfPersonal(cardID)
+		if err != nil || ownerID != uid {
+			return nil, "", 403, "forbidden"
+		}
+		return card, "personal", 0, ""
+	}
+	role, err := h.Workspaces.AuthorizeWorkspace(uid, *card.WorkspaceID)
+	if err != nil {
+		return nil, "", 403, "forbidden"
+	}
+	return card, string(role), 0, ""
 }
