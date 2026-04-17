@@ -1,22 +1,29 @@
-<div class="backdrop" (click)="dismiss()"></div>
-<div class="dialog" (click)="$event.stopPropagation()">
-  <h3>New workspace</h3>
-  <input placeholder="Workspace name"
-         [value]="name()"
-         (input)="name.set($any($event.target).value)"
-         (keydown.enter)="create()" />
-  <button (click)="create()" [disabled]="!name().trim() || busy()">Create</button>
+<ui-modal title="Workspaces" size="sm">
+  <div class="ws-section">
+    <div class="ws-heading">New workspace</div>
+    <ui-input
+      placeholder="Workspace name"
+      [(value)]="name"
+      (keydown.enter)="create()" />
+    <ui-button size="sm" [disabled]="!name().trim() || busy()" (clicked)="create()">Create</ui-button>
+  </div>
 
-  <hr />
+  <hr class="ws-divider" />
 
-  <h3>Or join</h3>
-  <input placeholder="Invite code"
-         [value]="code()"
-         (input)="code.set($any($event.target).value)"
-         (keydown.enter)="join()" />
-  <button (click)="join()" [disabled]="!code().trim() || busy()">Join</button>
+  <div class="ws-section">
+    <div class="ws-heading">Or join with a code</div>
+    <ui-input
+      placeholder="Invite code"
+      [(value)]="code"
+      (keydown.enter)="join()" />
+    <ui-button size="sm" [disabled]="!code().trim() || busy()" (clicked)="join()">Join</ui-button>
+  </div>
 
-  @if (error()) { <div class="err">{{ error() }}</div> }
+  @if (error()) {
+    <ui-alert variant="danger">{{ error() }}</ui-alert>
+  }
 
-  <button class="close" (click)="dismiss()">Close</button>
-</div>
+  <div footer>
+    <ui-button variant="ghost" size="sm" (clicked)="dismiss()">Close</ui-button>
+  </div>
+</ui-modal>

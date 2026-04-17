@@ -1,15 +1,24 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
+import {
+  AlertComponent,
+  ButtonComponent,
+  DIALOG_REF,
+  DialogRef,
+  InputComponent,
+  ModalComponent,
+} from '@m1z23r/ngx-ui';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 
 @Component({
   selector: 'app-workspace-dialog',
   standalone: true,
+  imports: [ModalComponent, ButtonComponent, InputComponent, AlertComponent],
   templateUrl: './workspace-dialog.html',
   styleUrl: './workspace-dialog.css',
 })
 export class WorkspaceDialog {
+  private dialogRef = inject(DIALOG_REF) as DialogRef<void>;
   private svc = inject(WorkspaceService);
-  readonly closed = output<void>();
 
   readonly name = signal('');
   readonly code = signal('');
@@ -24,7 +33,7 @@ export class WorkspaceDialog {
     try {
       const ws = await this.svc.create(n);
       this.svc.setActive(ws.id);
-      this.closed.emit();
+      this.dialogRef.close();
     } catch {
       this.error.set('Could not create workspace');
     } finally {
@@ -40,7 +49,7 @@ export class WorkspaceDialog {
     try {
       const ws = await this.svc.join(c);
       this.svc.setActive(ws.id);
-      this.closed.emit();
+      this.dialogRef.close();
     } catch {
       this.error.set('Invalid or disabled code');
     } finally {
@@ -49,6 +58,6 @@ export class WorkspaceDialog {
   }
 
   dismiss(): void {
-    this.closed.emit();
+    this.dialogRef.close();
   }
 }

@@ -1,64 +1,48 @@
 .ws-sidebar {
   position: fixed;
-  top: 60px;
+  top: 72px;
   left: 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  padding: 8px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-md);
   z-index: 20;
+  min-width: 200px;
 }
 .ws-row {
-  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: rgba(255,255,255,0.9);
-  border: 1px solid #d4d4d8;
-  border-radius: 6px;
-  cursor: pointer;
-  min-width: 140px;
-}
-.ws-row.active { background: #fde68a; }
-.ws-row:hover .ws-menu-btn { opacity: 1; }
-.ws-menu-btn {
-  opacity: 0;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 0 4px;
-  margin-left: auto;
-}
-.ws-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  background: white;
-  border: 1px solid #d4d4d8;
-  border-radius: 6px;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
   gap: 4px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  z-index: 21;
+  padding: 2px 4px;
+  border-radius: var(--ui-radius-sm);
+  transition: background var(--ui-transition-fast);
 }
-.ws-menu button {
+.ws-row:hover {
+  background: var(--ui-bg-hover);
+}
+.ws-row.active {
+  background: color-mix(in srgb, var(--ui-primary) 12%, transparent);
+}
+.ws-name-btn {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
   background: transparent;
   border: none;
-  padding: 4px 8px;
-  text-align: left;
+  padding: 6px 8px;
   cursor: pointer;
-  border-radius: 4px;
+  font-size: var(--ui-font-sm);
+  color: var(--ui-text);
+  border-radius: var(--ui-radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.ws-menu button:hover { background: #f4f4f5; }
-.ws-add {
-  padding: 6px 10px;
-  background: #a7f3d0;
-  border: 1px solid #6ee7b7;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 18px;
+.ws-row.active .ws-name-btn {
+  color: var(--ui-primary);
+  font-weight: 500;
 }
-.ws-add:hover { background: #6ee7b7; }

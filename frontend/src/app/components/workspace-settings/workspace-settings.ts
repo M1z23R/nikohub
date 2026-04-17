@@ -1,62 +1,95 @@
-import { Component, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import {
-  WorkspaceService,
+  AlertComponent,
+  BadgeComponent,
+  ButtonComponent,
+  DIALOG_DATA,
+  DIALOG_REF,
+  DialogRef,
+  InputComponent,
+  ModalComponent,
+  TabComponent,
+  TabsComponent,
+} from '@m1z23r/ngx-ui';
+import {
   IWorkspace,
   IWorkspaceMember,
+  WorkspaceService,
 } from '../../core/workspace/workspace.service';
 
-type Pane = 'rename' | 'codes' | 'members' | 'delete';
+interface IWorkspaceSettingsData {
+  workspaceId: string;
+}
 
 @Component({
   selector: 'app-workspace-settings',
   standalone: true,
+  imports: [
+    ModalComponent,
+    ButtonComponent,
+    InputComponent,
+    TabsComponent,
+    TabComponent,
+    BadgeComponent,
+    AlertComponent,
+  ],
   templateUrl: './workspace-settings.html',
   styleUrl: './workspace-settings.css',
 })
 export class WorkspaceSettings {
+  private dialogRef = inject(DIALOG_REF) as DialogRef<void>;
+  private data = inject(DIALOG_DATA) as IWorkspaceSettingsData;
   private svc = inject(WorkspaceService);
 
-  readonly workspace = input.required<IWorkspace>();
-  readonly closed = output<void>();
+  readonly workspace = computed<IWorkspace | undefined>(() =>
+    this.svc.list().find((w) => w.id === this.data.workspaceId),
+  );
 
-  readonly pane = signal<Pane>('rename');
+  readonly activeTab = signal<string | number>('rename');
   readonly renameValue = signal('');
   readonly members = signal<IWorkspaceMember[] | null>(null);
   readonly confirmName = signal('');
   readonly busy = signal(false);
   readonly error = signal('');
 
-  open(p: Pane): void {
-    this.pane.set(p);
-    this.error.set('');
-    if (p === 'rename') this.renameValue.set(this.workspace().name);
-    if (p === 'members') this.loadMembers();
-    if (p === 'delete') this.confirmName.set('');
+  constructor() {
+    const w = this.workspace();
+    if (w) this.renameValue.set(w.name);
+
+    effect(() => {
+      const tab = this.activeTab();
+      this.error.set('');
+      const current = this.workspace();
+      if (!current) return;
+      if (tab === 'rename') this.renameValue.set(current.name);
+      if (tab === 'members') void this.loadMembers();
+      if (tab === 'delete') this.confirmName.set('');
+    });
   }
 
   async rename(): Promise<void> {
+    const w = this.workspace();
     const n = this.renameValue().trim();
-    const id = this.workspace().id;
-    if (!n || !id || this.busy()) return;
+    if (!n || !w?.id || this.busy()) return;
     this.busy.set(true);
     try {
-      await this.svc.rename(id, n);
-      this.closed.emit();
+      await this.svc.rename(w.id, n);
+      this.dialogRef.close();
     } finally {
       this.busy.set(false);
     }
   }
 
   async rotate(kind: 'viewer' | 'editor'): Promise<void> {
-    const id = this.workspace().id;
-    if (!id) return;
-    await this.svc.rotateCode(id, kind);
+    const w = this.workspace();
+    if (!w?.id) return;
+    await this.svc.rotateCode(w.id, kind);
   }
 
   async disable(kind: 'viewer' | 'editor'): Promise<void> {
-    const id = this.workspace().id;
-    if (!id) return;
-    await this.svc.disableCode(id, kind);
+    const w = this.workspace();
+    if (!w?.id) return;
+    await this.svc.disableCode(w.id, kind);
   }
 
   async copy(code: string): Promise<void> {
@@ -64,33 +97,37 @@ export class WorkspaceSettings {
   }
 
   async loadMembers(): Promise<void> {
-    const id = this.workspace().id;
-    if (!id) return;
+    const w = this.workspace();
+    if (!w?.id) return;
     this.members.set(null);
-    const m = await this.svc.members(id);
+    const m = await this.svc.members(w.id);
     this.members.set(m);
   }
 
   async kick(userId: string): Promise<void> {
-    const id = this.workspace().id;
-    if (!id) return;
-    await this.svc.kick(id, userId);
+    const w = this.workspace();
+    if (!w?.id) return;
+    await this.svc.kick(w.id, userId);
     this.members.update((m) => (m ?? []).filter((x) => x.user_id !== userId));
   }
 
   async remove(): Promise<void> {
-    const id = this.workspace().id;
-    if (!id) return;
-    if (this.confirmName() !== this.workspace().name) {
+    const w = this.workspace();
+    if (!w?.id) return;
+    if (this.confirmName() !== w.name) {
       this.error.set('Name mismatch');
       return;
     }
     this.busy.set(true);
     try {
-      await this.svc.delete(id);
-      this.closed.emit();
+      await this.svc.delete(w.id);
+      this.dialogRef.close();
     } finally {
       this.busy.set(false);
     }
+  }
+
+  dismiss(): void {
+    this.dialogRef.close();
   }
 }

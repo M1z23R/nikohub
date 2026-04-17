@@ -1,55 +1,16 @@
-.backdrop {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.3);
-  z-index: 40;
-}
-.dialog {
-  position: fixed; top: 50%; left: 50%;
-  transform: translate(-50%,-50%);
-  background: white;
-  padding: 16px 20px;
-  border-radius: 8px;
+.ws-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 320px;
-  z-index: 41;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-}
-.dialog h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-}
-.dialog input {
-  padding: 6px 8px;
-  border: 1px solid #d4d4d8;
-  border-radius: 4px;
-  font-size: 14px;
-}
-.dialog button {
-  padding: 6px 12px;
-  border: 1px solid #6ee7b7;
-  background: #a7f3d0;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-}
-.dialog button:hover:not(:disabled) { background: #6ee7b7; }
-.dialog button:disabled { opacity: 0.5; cursor: not-allowed; }
-.dialog hr {
-  width: 100%;
-  border: none;
-  border-top: 1px solid #e5e7eb;
   margin: 8px 0;
 }
-.dialog .err {
-  color: #b91c1c;
-  font-size: 12px;
+.ws-heading {
+  font-size: var(--ui-font-sm);
+  font-weight: 600;
+  color: var(--ui-text-muted);
 }
-.dialog .close {
-  margin-top: 8px;
-  background: #f4f4f5;
-  border: 1px solid #d4d4d8;
+.ws-divider {
+  border: none;
+  border-top: 1px solid var(--ui-border);
+  margin: 12px 0;
 }
-.dialog .close:hover { background: #e5e7eb; }

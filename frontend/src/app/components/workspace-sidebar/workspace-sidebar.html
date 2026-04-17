@@ -1,32 +1,22 @@
 <div class="ws-sidebar">
   @for (w of list(); track w.id ?? 'personal') {
-    <div class="ws-row"
-         [class.active]="activeId() === w.id"
-         (click)="select(w)">
-      <span class="ws-name">{{ w.name }}</span>
+    <div class="ws-row" [class.active]="activeId() === w.id">
+      <button class="ws-name-btn" (click)="select(w)">{{ w.name }}</button>
       @if (w.id) {
-        <button class="ws-menu-btn"
-                (click)="toggleMenu(w, $event)"
-                aria-label="Workspace actions">…</button>
-      }
-      @if (menuFor()?.id === w.id) {
-        <div class="ws-menu" (click)="$event.stopPropagation()">
+        <ui-dropdown position="bottom-end">
+          <ui-button
+            uiDropdownTrigger
+            variant="ghost"
+            size="sm"
+            aria-label="Workspace actions">⋯</ui-button>
           @if (w.role === 'owner') {
-            <button (click)="openSettings(w)">Settings</button>
+            <ui-dropdown-item (clicked)="openSettings(w)">Settings</ui-dropdown-item>
           } @else {
-            <button (click)="leave(w)">Leave</button>
+            <ui-dropdown-item (clicked)="leave(w)">Leave</ui-dropdown-item>
           }
-        </div>
+        </ui-dropdown>
       }
     </div>
   }
-  <button class="ws-add" (click)="openDialog()">+</button>
+  <ui-button variant="outline" size="sm" (clicked)="openNewOrJoin()">New / Join</ui-button>
 </div>
-
-@if (dialogOpen()) {
-  <app-workspace-dialog (closed)="dialogOpen.set(false)" />
-}
-
-@if (settingsFor(); as w) {
-  <app-workspace-settings [workspace]="w" (closed)="settingsFor.set(null)" />
-}

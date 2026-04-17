@@ -1,61 +1,93 @@
-<div class="backdrop" (click)="closed.emit()"></div>
-<div class="panel" (click)="$event.stopPropagation()">
-  <div class="tabs">
-    <button (click)="open('rename')" [class.active]="pane() === 'rename'">Rename</button>
-    <button (click)="open('codes')" [class.active]="pane() === 'codes'">Invite codes</button>
-    <button (click)="open('members')" [class.active]="pane() === 'members'">Members</button>
-    <button (click)="open('delete')" [class.active]="pane() === 'delete'">Delete</button>
-  </div>
+@if (workspace(); as w) {
+<ui-modal [title]="w.name" size="md">
+  <ui-tabs variant="underline" [(activeTab)]="activeTab">
+    <ui-tab label="Rename" id="rename">
+      <div class="pane">
+        <ui-input
+          placeholder="Workspace name"
+          [(value)]="renameValue"
+          (keydown.enter)="rename()" />
+        <ui-button size="sm" [disabled]="!renameValue().trim() || busy()" (clicked)="rename()">Save</ui-button>
+      </div>
+    </ui-tab>
 
-  @if (pane() === 'rename') {
-    <input [value]="renameValue()"
-           (input)="renameValue.set($any($event.target).value)"
-           (keydown.enter)="rename()" />
-    <button (click)="rename()" [disabled]="!renameValue().trim() || busy()">Save</button>
-  }
-
-  @if (pane() === 'codes') {
-    <div class="code-row">
-      <span>Viewer:</span>
-      <code>{{ workspace().viewer_code ?? '(disabled)' }}</code>
-      @if (workspace().viewer_code) {
-        <button (click)="copy(workspace().viewer_code!)">Copy</button>
-      }
-      <button (click)="rotate('viewer')">Regenerate</button>
-      <button (click)="disable('viewer')">Disable</button>
-    </div>
-    <div class="code-row">
-      <span>Editor:</span>
-      <code>{{ workspace().editor_code ?? '(disabled)' }}</code>
-      @if (workspace().editor_code) {
-        <button (click)="copy(workspace().editor_code!)">Copy</button>
-      }
-      <button (click)="rotate('editor')">Regenerate</button>
-      <button (click)="disable('editor')">Disable</button>
-    </div>
-  }
-
-  @if (pane() === 'members') {
-    @if (members(); as list) {
-      @if (!list.length) { <div>No members yet.</div> }
-      @for (m of list; track m.user_id) {
-        <div class="member-row">
-          <span>{{ m.name }} ({{ m.role }})</span>
-          <button (click)="kick(m.user_id)">Kick</button>
+    <ui-tab label="Invite codes" id="codes">
+      <div class="pane">
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-label">Viewer</span>
+            <ui-badge variant="default" size="sm">read-only</ui-badge>
+          </div>
+          <code class="code-value">{{ w.viewer_code ?? '(disabled)' }}</code>
+          <div class="code-actions">
+            @if (w.viewer_code) {
+              <ui-button size="sm" variant="ghost" (clicked)="copy(w.viewer_code!)">Copy</ui-button>
+            }
+            <ui-button size="sm" variant="outline" (clicked)="rotate('viewer')">Regenerate</ui-button>
+            @if (w.viewer_code) {
+              <ui-button size="sm" variant="ghost" color="danger" (clicked)="disable('viewer')">Disable</ui-button>
+            }
+          </div>
         </div>
-      }
-    } @else {
-      <div>Loading…</div>
-    }
-  }
 
-  @if (pane() === 'delete') {
-    <div>Type <b>{{ workspace().name }}</b> to confirm deletion:</div>
-    <input [value]="confirmName()"
-           (input)="confirmName.set($any($event.target).value)" />
-    @if (error()) { <div class="err">{{ error() }}</div> }
-    <button class="danger" (click)="remove()" [disabled]="busy()">Delete workspace</button>
-  }
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-label">Editor</span>
+            <ui-badge variant="primary" size="sm">can edit</ui-badge>
+          </div>
+          <code class="code-value">{{ w.editor_code ?? '(disabled)' }}</code>
+          <div class="code-actions">
+            @if (w.editor_code) {
+              <ui-button size="sm" variant="ghost" (clicked)="copy(w.editor_code!)">Copy</ui-button>
+            }
+            <ui-button size="sm" variant="outline" (clicked)="rotate('editor')">Regenerate</ui-button>
+            @if (w.editor_code) {
+              <ui-button size="sm" variant="ghost" color="danger" (clicked)="disable('editor')">Disable</ui-button>
+            }
+          </div>
+        </div>
+      </div>
+    </ui-tab>
 
-  <button class="close" (click)="closed.emit()">Close</button>
-</div>
+    <ui-tab label="Members" id="members">
+      <div class="pane">
+        @if (members(); as list) {
+          @if (!list.length) {
+            <div class="empty">No members yet. Share an invite code to add someone.</div>
+          }
+          @for (m of list; track m.user_id) {
+            <div class="member-row">
+              <div class="member-info">
+                <span class="member-name">{{ m.name }}</span>
+                <ui-badge [variant]="m.role === 'editor' ? 'primary' : 'default'" size="sm">{{ m.role }}</ui-badge>
+              </div>
+              <ui-button size="sm" variant="ghost" color="danger" (clicked)="kick(m.user_id)">Kick</ui-button>
+            </div>
+          }
+        } @else {
+          <div class="empty">Loading…</div>
+        }
+      </div>
+    </ui-tab>
+
+    <ui-tab label="Delete" id="delete">
+      <div class="pane">
+        <ui-alert variant="warning" title="This cannot be undone">
+          All cards in this workspace will be deleted for every member. Type <b>{{ w.name }}</b> below to confirm.
+        </ui-alert>
+        <ui-input
+          placeholder="Type workspace name"
+          [(value)]="confirmName" />
+        @if (error()) {
+          <ui-alert variant="danger">{{ error() }}</ui-alert>
+        }
+        <ui-button size="sm" color="danger" [disabled]="busy()" (clicked)="remove()">Delete workspace</ui-button>
+      </div>
+    </ui-tab>
+  </ui-tabs>
+
+  <div footer>
+    <ui-button variant="ghost" size="sm" (clicked)="dismiss()">Close</ui-button>
+  </div>
+</ui-modal>
+}
