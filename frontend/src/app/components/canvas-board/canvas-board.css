@@ -56,6 +56,8 @@
   pointer-events: none;
   transform: translate(-4px, -4px);
   z-index: 100;
+  transition: left 80ms linear, top 80ms linear;
+  will-change: left, top;
 }
 .remote-cursor .dot {
   width: 10px;
