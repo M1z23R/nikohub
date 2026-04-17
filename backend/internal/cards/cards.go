@@ -95,16 +95,20 @@ func NewRepo(db *sql.DB) *Repo { return &Repo{db: db} }
 func (r *Repo) ListPersonal(userID uuid.UUID) ([]Card, error) {
 	rows, err := r.db.Query(`
 		SELECT `+returnCols+`
-		FROM cards WHERE user_id=$1 AND workspace_id IS NULL
-		ORDER BY z_index ASC, created_at ASC`, userID)
+		FROM cards c
+		LEFT JOIN card_favorites f ON f.card_id = c.id AND f.user_id = $1
+		WHERE c.user_id=$1 AND c.workspace_id IS NULL
+		ORDER BY c.z_index ASC, c.created_at ASC`, userID)
 	return r.scanList(rows, err)
 }
 
-func (r *Repo) ListWorkspace(workspaceID uuid.UUID) ([]Card, error) {
+func (r *Repo) ListWorkspace(userID, workspaceID uuid.UUID) ([]Card, error) {
 	rows, err := r.db.Query(`
 		SELECT `+returnCols+`
-		FROM cards WHERE workspace_id=$1
-		ORDER BY z_index ASC, created_at ASC`, workspaceID)
+		FROM cards c
+		LEFT JOIN card_favorites f ON f.card_id = c.id AND f.user_id = $1
+		WHERE c.workspace_id=$2
+		ORDER BY c.z_index ASC, c.created_at ASC`, userID, workspaceID)
 	return r.scanList(rows, err)
 }
 
@@ -134,7 +138,7 @@ type CreateInput struct {
 	TotpName            string
 }
 
-const returnCols = `id,workspace_id,x,y,width,height,color,text,(image_data IS NOT NULL),z_index,card_type,is_secret,is_favorite,sidebar_order,COALESCE(totp_name,''),container_id,title,updated_at`
+const returnCols = `c.id,c.workspace_id,c.x,c.y,c.width,c.height,c.color,c.text,(c.image_data IS NOT NULL),c.z_index,c.card_type,c.is_secret,(f.card_id IS NOT NULL) AS is_favorite,COALESCE(f.sidebar_order,0) AS sidebar_order,COALESCE(c.totp_name,''),c.container_id,c.title,c.updated_at`
 
 func scanCard(row interface{ Scan(...any) error }, c *Card) error {
 	var containerID uuid.NullUUID
@@ -169,37 +173,34 @@ func (r *Repo) Create(userID uuid.UUID, in CreateInput) (*Card, error) {
 	if height <= 0 {
 		height = 160
 	}
-	c := &Card{}
 	var totpSecret, totpName *string
 	if cardType == "totp" {
 		totpSecret = &in.TotpSecret
 		totpName = &in.TotpName
 	}
+	var id uuid.UUID
 	err := r.db.QueryRow(`
 		INSERT INTO cards(user_id,workspace_id,x,y,width,height,color,text,title,card_type,is_secret,totp_secret,totp_name)
 		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-		RETURNING `+returnCols,
+		RETURNING id`,
 		userID, in.WorkspaceID, in.X, in.Y, width, height, color, in.Text, in.Title, cardType, in.IsSecret, totpSecret, totpName,
-	)
-	if err := scanCard(err, c); err != nil {
+	).Scan(&id)
+	if err != nil {
 		return nil, err
 	}
-	return c, nil
+	return r.GetByID(userID, id)
 }
 
 type UpdateInput struct {
 	X, Y, Width, Height, ZIndex *int
-	SidebarOrder                *int
 	Color, Text, Title          *string
 	IsSecret                    *bool
-	IsFavorite                  *bool
 	ContainerID                 *uuid.UUID
 	ClearContainerID            bool
 }
 
-func (r *Repo) Update(id uuid.UUID, in UpdateInput) (*Card, error) {
-	c := &Card{}
-	row := r.db.QueryRow(`
+func (r *Repo) Update(userID, id uuid.UUID, in UpdateInput) (*Card, error) {
+	_, err := r.db.Exec(`
 		UPDATE cards SET
 		  x = COALESCE($2,x),
 		  y = COALESCE($3,y),
@@ -210,19 +211,53 @@ func (r *Repo) Update(id uuid.UUID, in UpdateInput) (*Card, error) {
 		  text = COALESCE($8,text),
 		  title = COALESCE($9,title),
 		  is_secret = COALESCE($10,is_secret),
-		  is_favorite = COALESCE($13,is_favorite),
-		  sidebar_order = COALESCE($14,sidebar_order),
 		  container_id = CASE WHEN $12 THEN NULL WHEN $11::uuid IS NOT NULL THEN $11::uuid ELSE container_id END,
 		  updated_at = now()
-		WHERE id=$1
-		RETURNING `+returnCols,
+		WHERE id=$1`,
 		id, in.X, in.Y, in.Width, in.Height, in.ZIndex, in.Color, in.Text, in.Title, in.IsSecret,
-		in.ContainerID, in.ClearContainerID, in.IsFavorite, in.SidebarOrder,
+		in.ContainerID, in.ClearContainerID,
 	)
-	if err := scanCard(row, c); err != nil {
+	if err != nil {
 		return nil, err
 	}
-	return c, nil
+	return r.GetByID(userID, id)
+}
+
+func (r *Repo) SetFavorite(userID, cardID uuid.UUID, on bool, sidebarOrder *int) error {
+	if !on {
+		_, err := r.db.Exec(
+			`DELETE FROM card_favorites WHERE user_id=$1 AND card_id=$2`,
+			userID, cardID,
+		)
+		return err
+	}
+	order := 0
+	if sidebarOrder != nil {
+		order = *sidebarOrder
+	}
+	_, err := r.db.Exec(`
+		INSERT INTO card_favorites(user_id, card_id, sidebar_order)
+		VALUES($1, $2, $3)
+		ON CONFLICT (user_id, card_id) DO UPDATE
+		SET sidebar_order = CASE WHEN $4 THEN EXCLUDED.sidebar_order ELSE card_favorites.sidebar_order END`,
+		userID, cardID, order, sidebarOrder != nil,
+	)
+	return err
+}
+
+func (r *Repo) SetFavoriteOrder(userID, cardID uuid.UUID, order int) error {
+	res, err := r.db.Exec(
+		`UPDATE card_favorites SET sidebar_order=$3 WHERE user_id=$1 AND card_id=$2`,
+		userID, cardID, order,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func (r *Repo) Delete(id uuid.UUID) error {
@@ -282,10 +317,14 @@ func (r *Repo) GetImage(id uuid.UUID) (string, []byte, error) {
 	return mime.String, data, nil
 }
 
-func (r *Repo) GetByID(id uuid.UUID) (*Card, error) {
+func (r *Repo) GetByID(userID, id uuid.UUID) (*Card, error) {
 	c := &Card{}
 	row := r.db.QueryRow(
-		`SELECT `+returnCols+` FROM cards WHERE id=$1`, id,
+		`SELECT `+returnCols+`
+		 FROM cards c
+		 LEFT JOIN card_favorites f ON f.card_id = c.id AND f.user_id = $1
+		 WHERE c.id=$2`,
+		userID, id,
 	)
 	if err := scanCard(row, c); err != nil {
 		return nil, err

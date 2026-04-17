@@ -38,7 +38,7 @@ func (h *Handlers) List(c *drift.Context) {
 	if wsID == nil {
 		list, err = h.Repo.ListPersonal(uid)
 	} else {
-		list, err = h.Repo.ListWorkspace(*wsID)
+		list, err = h.Repo.ListWorkspace(uid, *wsID)
 	}
 	if err != nil {
 		httpx.Err(c, 500, "list failed")
@@ -129,48 +129,74 @@ func (h *Handlers) Patch(c *drift.Context) {
 		httpx.Err(c, code, msg)
 		return
 	}
-	if role == string(workspaces.RoleViewer) {
-		httpx.Err(c, 403, "viewers cannot edit")
-		return
-	}
 	var in patchReq
 	if err := c.BindJSON(&in); err != nil {
 		httpx.Err(c, 400, "bad json")
 		return
 	}
 
-	var containerID *uuid.UUID
-	clearContainerID := false
-	if in.ContainerID != nil {
-		if *in.ContainerID == "" {
-			clearContainerID = true
-		} else {
-			parsed, err := uuid.Parse(*in.ContainerID)
-			if err != nil {
-				httpx.Err(c, 400, "bad container_id")
+	favoriteTouched := in.IsFavorite != nil || in.SidebarOrder != nil
+	if favoriteTouched {
+		if in.IsFavorite != nil {
+			if err := h.Repo.SetFavorite(uid, id, *in.IsFavorite, in.SidebarOrder); err != nil {
+				httpx.Err(c, 500, "favorite failed")
 				return
 			}
-			containerID = &parsed
+		} else {
+			if err := h.Repo.SetFavoriteOrder(uid, id, *in.SidebarOrder); err != nil && err != sql.ErrNoRows {
+				httpx.Err(c, 500, "reorder failed")
+				return
+			}
 		}
 	}
 
-	card, err := h.Repo.Update(id, UpdateInput{
-		X: in.X, Y: in.Y, Width: in.Width, Height: in.Height, ZIndex: in.ZIndex,
-		SidebarOrder: in.SidebarOrder,
-		Color: in.Color, Text: in.Text, Title: in.Title, IsSecret: in.IsSecret, IsFavorite: in.IsFavorite,
-		ContainerID: containerID, ClearContainerID: clearContainerID,
-	})
-	if err == sql.ErrNoRows {
-		httpx.Err(c, 404, "not found")
+	intrinsicTouched := in.X != nil || in.Y != nil || in.Width != nil || in.Height != nil ||
+		in.ZIndex != nil || in.Color != nil || in.Text != nil || in.Title != nil ||
+		in.IsSecret != nil || in.ContainerID != nil
+	if intrinsicTouched {
+		if role == string(workspaces.RoleViewer) {
+			httpx.Err(c, 403, "viewers cannot edit")
+			return
+		}
+		var containerID *uuid.UUID
+		clearContainerID := false
+		if in.ContainerID != nil {
+			if *in.ContainerID == "" {
+				clearContainerID = true
+			} else {
+				parsed, err := uuid.Parse(*in.ContainerID)
+				if err != nil {
+					httpx.Err(c, 400, "bad container_id")
+					return
+				}
+				containerID = &parsed
+			}
+		}
+		card, err := h.Repo.Update(uid, id, UpdateInput{
+			X: in.X, Y: in.Y, Width: in.Width, Height: in.Height, ZIndex: in.ZIndex,
+			Color: in.Color, Text: in.Text, Title: in.Title, IsSecret: in.IsSecret,
+			ContainerID: containerID, ClearContainerID: clearContainerID,
+		})
+		if err == sql.ErrNoRows {
+			httpx.Err(c, 404, "not found")
+			return
+		}
+		if err != nil {
+			log.Printf("UPDATE CARD ERROR: %v", err)
+			httpx.Err(c, 500, "update failed")
+			return
+		}
+		c.JSON(200, RedactForRole(*card, role))
+		h.broadcastCard(card.WorkspaceID, "card.updated", *card, uid)
 		return
 	}
+
+	card, err := h.Repo.GetByID(uid, id)
 	if err != nil {
-		log.Printf("UPDATE CARD ERROR: %v", err)
-		httpx.Err(c, 500, "update failed")
+		httpx.Err(c, 500, "read failed")
 		return
 	}
 	c.JSON(200, RedactForRole(*card, role))
-	h.broadcastCard(card.WorkspaceID, "card.updated", *card, uid)
 }
 
 func (h *Handlers) Delete(c *drift.Context) {
@@ -252,7 +278,7 @@ func (h *Handlers) UploadImage(c *drift.Context) {
 		return
 	}
 	c.Status(204)
-	if updated, err := h.Repo.GetByID(id); err == nil {
+	if updated, err := h.Repo.GetByID(uid, id); err == nil {
 		h.broadcastCard(updated.WorkspaceID, "card.updated", *updated, uid)
 	}
 }
@@ -281,7 +307,7 @@ func (h *Handlers) DeleteImage(c *drift.Context) {
 		return
 	}
 	c.Status(204)
-	if updated, err := h.Repo.GetByID(id); err == nil {
+	if updated, err := h.Repo.GetByID(uid, id); err == nil {
 		h.broadcastCard(updated.WorkspaceID, "card.updated", *updated, uid)
 	}
 }
@@ -394,7 +420,7 @@ func (h *Handlers) resolveScope(uid uuid.UUID, raw string) (*uuid.UUID, string, 
 }
 
 func (h *Handlers) authorizeCard(uid, cardID uuid.UUID) (*Card, string, int, string) {
-	card, err := h.Repo.GetByID(cardID)
+	card, err := h.Repo.GetByID(uid, cardID)
 	if err == sql.ErrNoRows {
 		return nil, "", 404, "not found"
 	}
