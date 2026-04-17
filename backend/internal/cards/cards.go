@@ -89,6 +89,7 @@ func (r *Repo) GetAllSecrets(userID uuid.UUID) (map[uuid.UUID]string, error) {
 
 type Card struct {
 	ID          uuid.UUID  `json:"id"`
+	WorkspaceID *uuid.UUID `json:"workspace_id"`
 	X           int        `json:"x"`
 	Y           int        `json:"y"`
 	Width       int        `json:"width"`
@@ -115,6 +116,26 @@ func (r *Repo) List(userID uuid.UUID) ([]Card, error) {
 	rows, err := r.db.Query(`
 		SELECT `+returnCols+`
 		FROM cards WHERE user_id=$1 ORDER BY z_index ASC, created_at ASC`, userID)
+	return r.scanList(rows, err)
+}
+
+func (r *Repo) ListPersonal(userID uuid.UUID) ([]Card, error) {
+	rows, err := r.db.Query(`
+		SELECT `+returnCols+`
+		FROM cards WHERE user_id=$1 AND workspace_id IS NULL
+		ORDER BY z_index ASC, created_at ASC`, userID)
+	return r.scanList(rows, err)
+}
+
+func (r *Repo) ListWorkspace(workspaceID uuid.UUID) ([]Card, error) {
+	rows, err := r.db.Query(`
+		SELECT `+returnCols+`
+		FROM cards WHERE workspace_id=$1
+		ORDER BY z_index ASC, created_at ASC`, workspaceID)
+	return r.scanList(rows, err)
+}
+
+func (r *Repo) scanList(rows *sql.Rows, err error) ([]Card, error) {
 	if err != nil {
 		return nil, err
 	}
@@ -131,6 +152,7 @@ func (r *Repo) List(userID uuid.UUID) ([]Card, error) {
 }
 
 type CreateInput struct {
+	WorkspaceID         *uuid.UUID
 	X, Y, Width, Height int
 	Color, Text, Title  string
 	CardType            string
@@ -139,13 +161,17 @@ type CreateInput struct {
 	TotpName            string
 }
 
-const returnCols = `id,x,y,width,height,color,text,(image_data IS NOT NULL),z_index,card_type,is_secret,is_favorite,sidebar_order,COALESCE(totp_name,''),container_id,title,updated_at`
+const returnCols = `id,workspace_id,x,y,width,height,color,text,(image_data IS NOT NULL),z_index,card_type,is_secret,is_favorite,sidebar_order,COALESCE(totp_name,''),container_id,title,updated_at`
 
 func scanCard(row interface{ Scan(...any) error }, c *Card) error {
 	var containerID uuid.NullUUID
-	err := row.Scan(&c.ID, &c.X, &c.Y, &c.Width, &c.Height, &c.Color, &c.Text, &c.HasImage, &c.ZIndex, &c.CardType, &c.IsSecret, &c.IsFavorite, &c.SidebarOrder, &c.TotpName, &containerID, &c.Title, &c.UpdatedAt)
+	var workspaceID uuid.NullUUID
+	err := row.Scan(&c.ID, &workspaceID, &c.X, &c.Y, &c.Width, &c.Height, &c.Color, &c.Text, &c.HasImage, &c.ZIndex, &c.CardType, &c.IsSecret, &c.IsFavorite, &c.SidebarOrder, &c.TotpName, &containerID, &c.Title, &c.UpdatedAt)
 	if containerID.Valid {
 		c.ContainerID = &containerID.UUID
+	}
+	if workspaceID.Valid {
+		c.WorkspaceID = &workspaceID.UUID
 	}
 	return err
 }
@@ -177,10 +203,10 @@ func (r *Repo) Create(userID uuid.UUID, in CreateInput) (*Card, error) {
 		totpName = &in.TotpName
 	}
 	err := r.db.QueryRow(`
-		INSERT INTO cards(user_id,x,y,width,height,color,text,title,card_type,is_secret,totp_secret,totp_name)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+		INSERT INTO cards(user_id,workspace_id,x,y,width,height,color,text,title,card_type,is_secret,totp_secret,totp_name)
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		RETURNING `+returnCols,
-		userID, in.X, in.Y, width, height, color, in.Text, in.Title, cardType, in.IsSecret, totpSecret, totpName,
+		userID, in.WorkspaceID, in.X, in.Y, width, height, color, in.Text, in.Title, cardType, in.IsSecret, totpSecret, totpName,
 	)
 	if err := scanCard(err, c); err != nil {
 		return nil, err
@@ -281,4 +307,55 @@ func (r *Repo) GetImage(userID, id uuid.UUID) (string, []byte, error) {
 		return "", nil, sql.ErrNoRows
 	}
 	return mime.String, data, nil
+}
+
+func (r *Repo) GetByID(id uuid.UUID) (*Card, error) {
+	c := &Card{}
+	row := r.db.QueryRow(
+		`SELECT `+returnCols+` FROM cards WHERE id=$1`, id,
+	)
+	if err := scanCard(row, c); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (r *Repo) OwnerOfPersonal(id uuid.UUID) (uuid.UUID, error) {
+	var uid uuid.UUID
+	err := r.db.QueryRow(
+		`SELECT user_id FROM cards WHERE id=$1 AND workspace_id IS NULL`, id,
+	).Scan(&uid)
+	return uid, err
+}
+
+func (r *Repo) GetAllSecretsForScope(userID uuid.UUID, workspaceID *uuid.UUID) (map[uuid.UUID]string, error) {
+	var rows *sql.Rows
+	var err error
+	if workspaceID == nil {
+		rows, err = r.db.Query(
+			`SELECT id, totp_secret FROM cards
+			 WHERE user_id=$1 AND workspace_id IS NULL AND card_type='totp' AND totp_secret IS NOT NULL`,
+			userID,
+		)
+	} else {
+		rows, err = r.db.Query(
+			`SELECT id, totp_secret FROM cards
+			 WHERE workspace_id=$1 AND card_type='totp' AND totp_secret IS NOT NULL`,
+			*workspaceID,
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[uuid.UUID]string)
+	for rows.Next() {
+		var id uuid.UUID
+		var s string
+		if err := rows.Scan(&id, &s); err != nil {
+			return nil, err
+		}
+		out[id] = s
+	}
+	return out, rows.Err()
 }
